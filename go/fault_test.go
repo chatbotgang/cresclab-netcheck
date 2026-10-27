@@ -39,7 +39,8 @@ func TestReportFallsBackToNextWritableDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := string(b), "\xef\xbb\xbffirst\nsecond\n"; got != want {
+	// Windows writes CRLF line endings for Notepad, so compare line contents only.
+	if got, want := strings.ReplaceAll(string(b), "\r\n", "\n"), "\xef\xbb\xbffirst\nsecond\n"; got != want {
 		t.Errorf("file = %q, want %q", got, want)
 	}
 }
