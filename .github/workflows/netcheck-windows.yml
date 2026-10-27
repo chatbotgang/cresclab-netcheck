@@ -32,7 +32,7 @@ jobs:
           $files = @(Get-ChildItem $desktop -Filter 'cresclab-netcheck-*.txt' | Sort-Object Name)
           if ($files.Count -ne 2) { throw "expected 2 reports, found $($files.Count)" }
           New-Item -ItemType Directory -Force reports | Out-Null
-          $required = @('==================== maac.cresclab.com', 'traceroute maac.cresclab.com', '==================== Finished')
+          $required = @('==================== maac.cresclab.com', 'HTTP port 80', 'SNI comparison', 'ip=104.18.4.188', 'MTU: ping', 'Repeated HTTPS requests', 'traceroute maac.cresclab.com')
           foreach ($f in $files) {
             Copy-Item $f.FullName reports/
             $bytes = [IO.File]::ReadAllBytes($f.FullName)
