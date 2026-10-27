@@ -31,7 +31,8 @@ set "HAS_CURL="
 where curl.exe >nul 2>&1 && set "HAS_CURL=1"
 
 echo Crescendo Lab network check
-echo This takes about 4 minutes. Please keep this window open.
+echo This usually takes 3 to 5 minutes, and up to 12 minutes when connections fail.
+echo Please keep this window open until it says Done.
 echo Some checks may show errors or timeouts; that is expected and is part of the result.
 echo.
 
@@ -74,7 +75,7 @@ call :log "SNI comparison: same IP, different domain names"
 >>"%OUT%" echo If only maac.cresclab.com fails on the same IP, the network filters by domain name.
 if defined HAS_CURL (
   for %%I in (%SNI_IPS%) do for %%N in (%SNI_NAMES%) do (
-    >>"%OUT%" 2>&1 curl.exe -sS -o NUL --ssl-no-revoke --connect-timeout 10 -m 15 --resolve %%N:443:%%I -w "ip=%%I sni=%%N tcp=%%{time_connect}s tls=%%{time_appconnect}s total=%%{time_total}s http=%%{http_code}\n" https://%%N/cdn-cgi/trace
+    >>"%OUT%" 2>&1 curl.exe -sS -o NUL --ssl-no-revoke --connect-timeout 8 -m 10 --resolve %%N:443:%%I -w "ip=%%I sni=%%N tcp=%%{time_connect}s tls=%%{time_appconnect}s total=%%{time_total}s http=%%{http_code}\n" https://%%N/cdn-cgi/trace
   )
 ) else (
   >>"%OUT%" echo Skipped: curl.exe not found
@@ -94,7 +95,7 @@ echo Repeating requests to maac.cresclab.com 10 times ...
 call :log "Repeated HTTPS requests: %REPEAT_URL%"
 if defined HAS_CURL (
   for /l %%R in (1,1,10) do (
-    >>"%OUT%" 2>&1 curl.exe -sS -o NUL --ssl-no-revoke --connect-timeout 10 -m 10 -w "#%%R ip=%%{remote_ip} tcp=%%{time_connect}s tls=%%{time_appconnect}s total=%%{time_total}s http=%%{http_code}\n" %REPEAT_URL%
+    >>"%OUT%" 2>&1 curl.exe -sS -o NUL --ssl-no-revoke --connect-timeout 8 -m 8 -w "#%%R ip=%%{remote_ip} tcp=%%{time_connect}s tls=%%{time_appconnect}s total=%%{time_total}s http=%%{http_code}\n" %REPEAT_URL%
   )
 ) else (
   >>"%OUT%" echo Skipped: curl.exe not found
@@ -157,14 +158,14 @@ echo --- ping
 ping -n 4 -w 2000 %~1
 if not defined HAS_CURL goto :probe_powershell
 echo --- HTTPS, direct connection via curl
-curl.exe -sS -o NUL --ssl-no-revoke --connect-timeout 10 -m 20 -w "ip=%%{remote_ip} dns=%%{time_namelookup}s tcp=%%{time_connect}s tls=%%{time_appconnect}s ttfb=%%{time_starttransfer}s total=%%{time_total}s http=%%{http_code}\n" https://%~1/
+curl.exe -sS -o NUL --ssl-no-revoke --connect-timeout 8 -m 12 -w "ip=%%{remote_ip} dns=%%{time_namelookup}s tcp=%%{time_connect}s tls=%%{time_appconnect}s ttfb=%%{time_starttransfer}s total=%%{time_total}s http=%%{http_code}\n" https://%~1/
 echo --- HTTP port 80, first lines; a firewall block page shows up here
 del "%HTTP_TMP%" >nul 2>&1
-curl.exe -sS -i --connect-timeout 10 -m 15 -o "%HTTP_TMP%" http://%~1/
+curl.exe -sS -i --connect-timeout 8 -m 10 -o "%HTTP_TMP%" http://%~1/
 if exist "%HTTP_TMP%" powershell -NoProfile -Command "Get-Content -LiteralPath $env:HTTP_TMP -TotalCount 25" || type "%HTTP_TMP%"
 :probe_powershell
 echo --- HTTPS, system proxy settings via PowerShell
-powershell -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $sw=[Diagnostics.Stopwatch]::StartNew(); try { $r=Invoke-WebRequest -Uri 'https://%~1/' -UseBasicParsing -TimeoutSec 20 -MaximumRedirection 0 -ErrorAction Stop; $s='HTTP ' + [int]$r.StatusCode } catch { if ($_.Exception.Response) { $s='HTTP ' + [int]$_.Exception.Response.StatusCode } else { $s='ERROR: ' + $_.Exception.Message } }; $s + ' elapsed=' + $sw.ElapsedMilliseconds + 'ms'"
+powershell -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $sw=[Diagnostics.Stopwatch]::StartNew(); try { $r=Invoke-WebRequest -Uri 'https://%~1/' -UseBasicParsing -TimeoutSec 12 -MaximumRedirection 0 -ErrorAction Stop; $s='HTTP ' + [int]$r.StatusCode } catch { if ($_.Exception.Response) { $s='HTTP ' + [int]$_.Exception.Response.StatusCode } else { $s='ERROR: ' + $_.Exception.Message } }; $s + ' elapsed=' + $sw.ElapsedMilliseconds + 'ms'"
 exit /b 0
 
 

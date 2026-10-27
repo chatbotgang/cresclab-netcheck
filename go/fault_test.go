@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRunCheckRecoversFromPanic(t *testing.T) {
@@ -51,5 +52,23 @@ func TestReportWithoutWritableDirReportsError(t *testing.T) {
 	r.flush()
 	if _, err := r.close(); err == nil {
 		t.Error("close returned nil error, want the create failure")
+	}
+}
+
+func TestHTTPProbeReportsUnreachableHost(t *testing.T) {
+	if testing.Short() {
+		t.Skip("waits for a network timeout")
+	}
+	// 192.0.2.1 is reserved for documentation (RFC 5737), so nothing answers.
+	start := time.Now()
+	detail, status := httpProbe("https://example.invalid/", probeOptions{dialIP: "192.0.2.1"})
+	if !strings.HasPrefix(status, "FAIL") {
+		t.Errorf("status = %q, want FAIL", status)
+	}
+	if !strings.Contains(detail, "tls=-") {
+		t.Errorf("detail = %q, want tls=- to show the stalled step", detail)
+	}
+	if elapsed := time.Since(start); elapsed > requestTimeout+2*time.Second {
+		t.Errorf("took %s, want at most about %s", elapsed, requestTimeout)
 	}
 }
