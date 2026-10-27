@@ -1,0 +1,52 @@
+name: netcheck-windows
+on:
+  push:
+    branches: [netcheck-windows-test]
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - name: Go unit tests
+        working-directory: go
+        run: go test ./...
+      - name: Build exe
+        working-directory: go
+        env:
+          CGO_ENABLED: "0"
+        run: go build -trimpath -ldflags "-s -w" -o ../dist/cresclab-netcheck.exe .
+      - name: Run .bat
+        shell: cmd
+        run: echo.| call cresclab-netcheck.bat
+      - name: Run .exe
+        shell: cmd
+        run: echo.| dist\cresclab-netcheck.exe
+      - name: Verify reports
+        shell: pwsh
+        run: |
+          $desktop = [Environment]::GetFolderPath('Desktop')
+          $files = @(Get-ChildItem $desktop -Filter 'cresclab-netcheck-*.txt' | Sort-Object Name)
+          if ($files.Count -ne 2) { throw "expected 2 reports, found $($files.Count)" }
+          New-Item -ItemType Directory -Force reports | Out-Null
+          $required = @('==================== maac.cresclab.com', 'traceroute maac.cresclab.com', '==================== Finished')
+          foreach ($f in $files) {
+            Copy-Item $f.FullName reports/
+            $bytes = [IO.File]::ReadAllBytes($f.FullName)
+            if ($bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) { throw "$($f.Name) is not UTF-8 with BOM" }
+            $text = [IO.File]::ReadAllText($f.FullName)
+            foreach ($r in $required) { if (-not $text.Contains($r)) { throw "$($f.Name) misses '$r'" } }
+            if ($text -match 'is not recognized as an internal or external command') { throw "$($f.Name) contains a cmd error" }
+            Write-Host "===== $($f.Name) ($($bytes.Length) bytes)"
+            Write-Host $text
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: netcheck-windows
+          path: |
+            reports/
+            dist/cresclab-netcheck.exe
