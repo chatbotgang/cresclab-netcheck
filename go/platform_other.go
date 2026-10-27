@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 func consoleCodePage() uint32 { return 65001 }
@@ -20,6 +21,10 @@ func systemCommands() []command {
 
 func pingCommand(host string) command {
 	return command{name: "ping", args: []string{"-c", "4", "-W", "2000", host}}
+}
+
+func mtuPingCommand(ip string, size int) command {
+	return command{name: "ping", args: []string{"-D", "-s", strconv.Itoa(size), "-c", "2", "-W", "2000", ip}}
 }
 
 func traceCommand(host string) command {

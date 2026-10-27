@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 )
@@ -35,6 +36,10 @@ func systemCommands() []command {
 
 func pingCommand(host string) command {
 	return command{name: "ping", args: []string{"-n", "4", "-w", "2000", host}}
+}
+
+func mtuPingCommand(ip string, size int) command {
+	return command{name: "ping", args: []string{"-f", "-l", strconv.Itoa(size), "-n", "2", "-w", "2000", ip}}
 }
 
 func traceCommand(host string) command {

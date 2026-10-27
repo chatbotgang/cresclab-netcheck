@@ -1,28 +1,25 @@
-// Command cresclab-netcheck collects DNS, TCP, TLS, HTTP, and traceroute results
-// for Crescendo Lab services and writes them to a UTF-8 text file that customers
-// can send back to support. It only reads information and changes no settings.
+// Command cresclab-netcheck collects DNS, TCP, TLS, HTTP, MTU, and traceroute
+// results for Crescendo Lab services and writes them to a UTF-8 text file that
+// customers can send back to support. It only reads information and changes no
+// settings.
+//
+// Checks run concurrently, each with its own timeout. A check that fails,
+// hangs, or panics is recorded in the report and never stops the others, and
+// the report is written to disk as each check finishes, so closing the window
+// early still leaves partial results.
 package main
 
 import (
 	"bufio"
-	"context"
-	"crypto/tls"
-	"errors"
 	"fmt"
-	"io"
-	"net"
-	"net/http"
-	"net/http/httptrace"
 	"net/url"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 )
 
-const version = "2026-10-27"
+const version = "2026-10-27.2"
 
 var (
 	serviceHosts    = []string{"maac.cresclab.com", "caac.cresclab.com", "api.cresclab.com", "api.caac.cresclab.com", "cdn.caac.cresclab.com"}
@@ -30,27 +27,43 @@ var (
 	traceHosts      = []string{"maac.cresclab.com", "api.cresclab.com", "www.cloudflare.com"}
 	cloudflareTrace = []string{"https://www.cloudflare.com/cdn-cgi/trace", "https://maac.cresclab.com/cdn-cgi/trace"}
 	publicResolvers = []string{"1.1.1.1", "8.8.8.8"}
+
+	// Fixed Cloudflare edge IPs as of 2026-10-27, so the SNI and MTU checks still
+	// run when DNS is blocked. 104.18.x serves Crescendo Lab; 104.16.123.96
+	// normally serves www.cloudflare.com.
+	sniIPs    = []string{"104.18.4.188", "104.18.5.188", "104.16.123.96"}
+	sniNames  = []string{"maac.cresclab.com", "www.cloudflare.com"}
+	mtuTarget = "104.18.4.188"
+	mtuSizes  = []int{1472, 1400, 1300, 1200}
+
+	repeatURL   = "https://maac.cresclab.com/cdn-cgi/trace"
+	repeatCount = 10
 )
 
 const (
 	dialTimeout    = 10 * time.Second
-	requestTimeout = 20 * time.Second
+	requestTimeout = 15 * time.Second
 	commandTimeout = 3 * time.Minute
+	overallTimeout = 6 * time.Minute
 )
+
+// check is one independent diagnostic. run writes details to t and returns a
+// one-line summary for the end of the report, or "" for none.
+type check struct {
+	title string
+	run   func(t *text) string
+}
+
+type result struct{ body, summary string }
 
 func main() {
 	start := time.Now()
 	fmt.Println("Crescendo Lab network check")
 	fmt.Println("This takes about 2 minutes. Please keep this window open.")
+	fmt.Println("Some checks may show errors or timeouts; that is expected and is part of the result.")
 	fmt.Println()
 
-	// Traceroute is the slowest step, so it runs in the background while the other checks run.
-	traces := make([]<-chan string, len(traceHosts))
-	for i, host := range traceHosts {
-		traces[i] = runAsync(traceCommand(host))
-	}
-
-	r := &report{}
+	r := newReport("cresclab-netcheck-"+start.Format("20060102-150405")+".txt", outputDirs())
 	r.printf("Crescendo Lab network check - cresclab-netcheck.exe %s\n", version)
 	r.printf("Local time: %s\n", start.Format("2006-01-02 15:04:05 -0700"))
 	r.printf("UTC time:   %s\n", start.UTC().Format("2006-01-02 15:04:05"))
@@ -58,42 +71,92 @@ func main() {
 	r.printf("This file contains network adapter settings from ipconfig /all, proxy settings,\n")
 	r.printf("the public IP address seen by Cloudflare, and connection test results for\n")
 	r.printf("Crescendo Lab services. The program changes no settings.\n")
+	r.flush()
 
-	fmt.Println("Collecting system and network settings ...")
+	// Host checks reuse the browser proxy, so it is detected before the others start.
+	var proxyURL *url.URL
+	proxyCheck := check{"Proxy used for the extra HTTPS check", func(t *text) string {
+		var note string
+		proxyURL, note = systemProxy()
+		t.printf("%s\n", note)
+		return ""
+	}}
+	checks := []check{proxyCheck}
+	pending := []<-chan result{done(runCheck(proxyCheck))}
+
+	var later []check
 	for _, c := range systemCommands() {
+		later = append(later, commandCheck(c))
+	}
+	later = append(later, check{"Cloudflare trace: public IP and Cloudflare location", cloudflareTraceCheck})
+	for _, host := range append(append([]string{}, serviceHosts...), controlHosts...) {
+		later = append(later, check{host, func(t *text) string { return probeHost(t, host, proxyURL) }})
+	}
+	later = append(later,
+		check{"SNI comparison: same IP, different domain names", sniCheck},
+		check{"MTU: ping " + mtuTarget + " with Don't Fragment", mtuCheck},
+		check{"Repeated HTTPS requests: " + repeatURL, repeatCheck},
+	)
+	for _, host := range traceHosts {
+		later = append(later, commandCheck(command{"traceroute " + host, traceCommand(host).name, traceCommand(host).args}))
+	}
+	for _, c := range later {
+		checks = append(checks, c)
+		pending = append(pending, startCheck(c))
+	}
+
+	// Results are written in a fixed order as soon as each one is ready.
+	deadline := time.After(overallTimeout)
+	expired := false
+	var summaries []string
+	for i, c := range checks {
+		var res result
+		ready := false
+		if expired {
+			// After the deadline, keep results that are already done but wait for nothing.
+			select {
+			case res = <-pending[i]:
+				ready = true
+			default:
+			}
+		} else {
+			select {
+			case res = <-pending[i]:
+				ready = true
+			case <-deadline:
+				expired = true
+			}
+		}
+		if !ready {
+			res = result{"[did not finish within " + overallTimeout.String() + "]\n", c.title + ": did not finish"}
+		}
+		fmt.Printf("[%d/%d] %s\n", i+1, len(checks), c.title)
 		r.section(c.title)
-		r.printf("%s", runCommand(c.name, c.args...))
+		r.printf("%s", res.body)
+		r.flush()
+		if res.summary != "" {
+			summaries = append(summaries, res.summary)
+		}
 	}
 
-	proxyURL, proxyNote := systemProxy()
-	r.section("Proxy used for the extra HTTPS check")
-	r.printf("%s\n", proxyNote)
-
-	r.section("Cloudflare trace: public IP and Cloudflare location")
-	for _, u := range cloudflareTrace {
-		r.printf("--- %s\n%s\n", u, fetchBody(u))
+	r.section("Summary")
+	r.printf("http80 fails on api and cdn hosts by design; they do not serve port 80.\n\n")
+	for _, s := range summaries {
+		r.printf("%s\n", s)
 	}
+	r.printf("\nElapsed: %s\n", time.Since(start).Round(time.Second))
+	r.flush()
+	path, err := r.close()
 
-	hosts := append(append([]string{}, serviceHosts...), controlHosts...)
-	for i, host := range hosts {
-		fmt.Printf("[%d/%d] Checking %s ...\n", i+1, len(hosts), host)
-		r.section(host)
-		probeHost(r, host, proxyURL)
+	fmt.Println()
+	fmt.Println("Summary:")
+	for _, s := range summaries {
+		fmt.Println("  " + s)
 	}
-
-	fmt.Println("Waiting for traceroute to finish ...")
-	for i, host := range traceHosts {
-		r.section("traceroute " + host)
-		r.printf("%s", <-traces[i])
-	}
-
-	r.section("Finished")
-	r.printf("Elapsed: %s\n", time.Since(start).Round(time.Second))
-
-	path, err := writeReport(r.String(), start)
 	fmt.Println()
 	if err != nil {
 		fmt.Println("Could not save the result file:", err)
+		fmt.Println("Please take a screenshot of this window and send it to Crescendo Lab.")
 	} else {
 		fmt.Println("Done. Result file:")
 		fmt.Println("  " + path)
@@ -105,231 +168,39 @@ func main() {
 	_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
 }
 
-type report struct{ b strings.Builder }
-
-func (r *report) printf(format string, a ...any) { fmt.Fprintf(&r.b, format, a...) }
-
-func (r *report) section(title string) {
-	r.printf("\n==================== %s ====================\n", title)
+// runCheck runs c and turns a panic into a recorded failure.
+func runCheck(c check) (res result) {
+	t := &text{}
+	defer func() {
+		if p := recover(); p != nil {
+			t.printf("[this check stopped unexpectedly: %v]\n", p)
+			res = result{t.String(), c.title + ": check stopped unexpectedly"}
+		}
+	}()
+	summary := c.run(t)
+	return result{t.String(), summary}
 }
 
-func (r *report) String() string { return r.b.String() }
-
-type command struct {
-	title string
-	name  string
-	args  []string
-}
-
-func runCommand(name string, args ...string) string {
-	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
-	text := decodeConsoleOutput(out)
-	if err != nil {
-		text += fmt.Sprintf("[command %s failed: %v]\n", name, err)
-	}
-	return text
-}
-
-func runAsync(c command) <-chan string {
-	ch := make(chan string, 1)
-	go func() { ch <- runCommand(c.name, c.args...) }()
+func startCheck(c check) <-chan result {
+	ch := make(chan result, 1)
+	go func() { ch <- runCheck(c) }()
 	return ch
 }
 
-func probeHost(r *report, host string, proxyURL *url.URL) {
-	r.printf("--- DNS, system resolver\n")
-	addrs, err := net.DefaultResolver.LookupIPAddr(context.Background(), host)
-	if err != nil {
-		r.printf("ERROR: %v\n", err)
-	} else {
-		r.printf("%s\n", joinAddrs(addrs))
-	}
-	for _, server := range publicResolvers {
-		r.printf("--- DNS, %s\n%s\n", server, lookupVia(server, host))
-	}
-
-	r.printf("--- ping\n%s", runCommand(pingCommand(host).name, pingCommand(host).args...))
-
-	r.printf("--- TCP connect to port 443\n")
-	for i, a := range addrs {
-		if i == 4 {
-			break
-		}
-		r.printf("%s\n", tcpConnect(a.IP))
-	}
-
-	r.printf("--- TLS handshake\n%s\n", tlsHandshake(host))
-	r.printf("--- HTTPS GET, direct connection\n%s\n", httpProbe("https://"+host+"/", nil))
-	if proxyURL != nil {
-		r.printf("--- HTTPS GET, through system proxy %s\n%s\n", proxyURL.Host, httpProbe("https://"+host+"/", proxyURL))
-	}
+func done(res result) <-chan result {
+	ch := make(chan result, 1)
+	ch <- res
+	return ch
 }
 
-func joinAddrs(addrs []net.IPAddr) string {
-	s := make([]string, len(addrs))
-	for i, a := range addrs {
-		s[i] = a.IP.String()
-	}
-	return strings.Join(s, " ")
+func commandCheck(c command) check {
+	return check{c.title, func(t *text) string {
+		t.printf("%s", runCommand(c.name, c.args...))
+		return ""
+	}}
 }
 
-func lookupVia(server, host string) string {
-	res := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
-			d := net.Dialer{Timeout: 5 * time.Second}
-			return d.DialContext(ctx, network, net.JoinHostPort(server, "53"))
-		},
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
-	defer cancel()
-	addrs, err := res.LookupIPAddr(ctx, host)
-	if err != nil {
-		return "ERROR: " + err.Error()
-	}
-	return joinAddrs(addrs)
-}
+// text is a string builder with printf.
+type text struct{ strings.Builder }
 
-func tcpConnect(ip net.IP) string {
-	addr := net.JoinHostPort(ip.String(), "443")
-	t := time.Now()
-	conn, err := net.DialTimeout("tcp", addr, dialTimeout)
-	elapsed := time.Since(t).Round(time.Millisecond)
-	if err != nil {
-		return fmt.Sprintf("%s FAILED after %s: %v", addr, elapsed, err)
-	}
-	conn.Close()
-	return fmt.Sprintf("%s OK in %s", addr, elapsed)
-}
-
-// tlsHandshake reports the certificate the network actually presents. When a
-// corporate firewall intercepts HTTPS, the issuer shows its own CA instead of
-// the public one, so a failed verification is retried without verification to
-// reveal that issuer.
-func tlsHandshake(host string) string {
-	dialer := &net.Dialer{Timeout: dialTimeout}
-	t := time.Now()
-	conn, err := tls.DialWithDialer(dialer, "tcp", net.JoinHostPort(host, "443"), &tls.Config{ServerName: host})
-	if err == nil {
-		defer conn.Close()
-		return describeTLS(conn, time.Since(t), "verified")
-	}
-	result := fmt.Sprintf("FAILED after %s: %v", time.Since(t).Round(time.Millisecond), err)
-	var verifyErr *tls.CertificateVerificationError
-	if !errors.As(err, &verifyErr) {
-		return result
-	}
-	t = time.Now()
-	conn, err = tls.DialWithDialer(dialer, "tcp", net.JoinHostPort(host, "443"), &tls.Config{ServerName: host, InsecureSkipVerify: true})
-	if err != nil {
-		return result
-	}
-	defer conn.Close()
-	return result + "\n" + describeTLS(conn, time.Since(t), "NOT trusted by this computer")
-}
-
-func describeTLS(conn *tls.Conn, elapsed time.Duration, trust string) string {
-	st := conn.ConnectionState()
-	s := fmt.Sprintf("OK in %s, %s, %s, remote %s, certificate %s",
-		elapsed.Round(time.Millisecond), tls.VersionName(st.Version), tls.CipherSuiteName(st.CipherSuite), conn.RemoteAddr(), trust)
-	if len(st.PeerCertificates) > 0 {
-		c := st.PeerCertificates[0]
-		s += fmt.Sprintf("\n  subject: %s\n  issuer:  %s\n  expires: %s", c.Subject, c.Issuer, c.NotAfter.Format("2006-01-02"))
-	}
-	return s
-}
-
-func httpProbe(target string, proxyURL *url.URL) string {
-	transport := &http.Transport{
-		DisableKeepAlives:   true,
-		ForceAttemptHTTP2:   true,
-		TLSHandshakeTimeout: dialTimeout,
-		DialContext:         (&net.Dialer{Timeout: dialTimeout}).DialContext,
-	}
-	if proxyURL != nil {
-		transport.Proxy = http.ProxyURL(proxyURL)
-	}
-	client := &http.Client{
-		Transport:     transport,
-		Timeout:       requestTimeout,
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-	}
-
-	var start, dnsDone, connDone, tlsDone, firstByte time.Time
-	var remote string
-	trace := &httptrace.ClientTrace{
-		DNSDone:              func(httptrace.DNSDoneInfo) { dnsDone = time.Now() },
-		ConnectDone:          func(_, addr string, _ error) { connDone = time.Now(); remote = addr },
-		TLSHandshakeDone:     func(tls.ConnectionState, error) { tlsDone = time.Now() },
-		GotFirstResponseByte: func() { firstByte = time.Now() },
-	}
-	req, err := http.NewRequest(http.MethodGet, target, nil)
-	if err != nil {
-		return "ERROR: " + err.Error()
-	}
-	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
-	req.Header.Set("User-Agent", "cresclab-netcheck/"+version)
-
-	start = time.Now()
-	resp, err := client.Do(req)
-	timing := fmt.Sprintf("remote=%s dns=%s tcp=%s tls=%s ttfb=%s total=%s",
-		remote, since(start, dnsDone), since(start, connDone), since(start, tlsDone), since(start, firstByte), time.Since(start).Round(time.Millisecond))
-	if err != nil {
-		return "ERROR: " + err.Error() + "\n" + timing
-	}
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
-	resp.Body.Close()
-	return fmt.Sprintf("HTTP %d %s\n%s", resp.StatusCode, resp.Proto, timing)
-}
-
-// since formats the time from start to an httptrace event, or "-" when the
-// event never happened, which shows the step where a connection stalled.
-func since(start, event time.Time) string {
-	if event.IsZero() {
-		return "-"
-	}
-	return event.Sub(start).Round(time.Millisecond).String()
-}
-
-func fetchBody(target string) string {
-	client := &http.Client{Timeout: requestTimeout}
-	resp, err := client.Get(target)
-	if err != nil {
-		return "ERROR: " + err.Error()
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	return fmt.Sprintf("HTTP %d\n%s", resp.StatusCode, strings.TrimSpace(string(body)))
-}
-
-func writeReport(text string, start time.Time) (string, error) {
-	if runtime.GOOS == "windows" {
-		text = strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\n", "\r\n")
-	}
-	name := "cresclab-netcheck-" + start.Format("20060102-150405") + ".txt"
-	var lastErr error
-	for _, dir := range outputDirs() {
-		path := filepath.Join(dir, name)
-		// The byte order mark lets Notepad on older Windows detect UTF-8.
-		if lastErr = os.WriteFile(path, []byte("\xef\xbb\xbf"+text), 0o644); lastErr == nil {
-			return path, nil
-		}
-	}
-	return "", lastErr
-}
-
-func outputDirs() []string {
-	var dirs []string
-	if d := desktopDir(); d != "" {
-		dirs = append(dirs, d)
-	}
-	if exe, err := os.Executable(); err == nil {
-		dirs = append(dirs, filepath.Dir(exe))
-	}
-	if wd, err := os.Getwd(); err == nil {
-		dirs = append(dirs, wd)
-	}
-	return append(dirs, os.TempDir())
-}
+func (t *text) printf(format string, a ...any) { fmt.Fprintf(&t.Builder, format, a...) }
