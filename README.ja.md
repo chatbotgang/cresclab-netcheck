@@ -10,7 +10,7 @@ MAAC や CAAC など Crescendo Lab のサービスに接続できないお客様
 
 ## ダウンロード
 
-[最新リリース](https://github.com/chatbotgang/cresclab-netcheck/releases/latest)からダウンロードします。このリポジトリは private のため、リリースページを開けるのは chatbotgang 組織のメンバーだけです。ファイルをダウンロードし、[お客様向けガイド](docs/customer-guide.zh-TW.md)（繁体字中国語）と一緒にお客様に送ってください。
+[最新リリース](https://github.com/chatbotgang/cresclab-netcheck/releases/latest)からダウンロードします。このページは公開されているため、お客様が自分でダウンロードできます。リンクを[お客様向けガイド](docs/customer-guide.zh-TW.md)（繁体字中国語）と一緒にお客様に送ってください。
 
 各リリースには、プラットフォームごとのアーカイブ、単体の `cresclab-netcheck.bat`、`checksums.txt` があります。アーカイブ名は `cresclab-netcheck_<バージョン>_<OS>_<アーキテクチャ>` の形式なので、名前の末尾で選びます。
 
@@ -107,3 +107,7 @@ mise run snapshot  # build and package every target into dist/
 - **CI** は pull request ごとと `main` への push ごとに実行されます。lint、Linux・macOS・Windows でのユニットテスト、全プラットフォームのスナップショットビルド、ビルドしたプログラムの Linux・macOS・Windows での実行を行います。Windows では、`.bat` と `.exe` を Windows ファイアウォールで Crescendo Lab の Cloudflare IP を遮断したネットワークでも実行し、失敗時の流れが最後まで進んで正しく報告されることを確認します。
 - **リリース**は [Conventional Commits](https://www.conventionalcommits.org/) に従います。release-please が `main` にリリース用の pull request を開いたままにします。これをマージするとタグと GitHub リリースが作成され、同じ workflow で GoReleaser がアーカイブ、単体の `.bat`、`checksums.txt` をアップロードします。release-please が開く pull request は `GITHUB_TOKEN` を使うため CI は実行されません。変更されるのは `CHANGELOG.md` とバージョンの manifest だけです。
 - **依存関係:** Dependabot が毎週、Go モジュールと GitHub Actions の pull request を開きます。`mise.toml` のツールのバージョンは手動で更新してください。
+
+## ライセンス
+
+ソースコードは [Apache License 2.0](LICENSE) でライセンスされています。Crescendo Lab、MAAC、CAAC などの名称はライセンスの対象外です。詳しくは [NOTICE](NOTICE) を参照してください。
