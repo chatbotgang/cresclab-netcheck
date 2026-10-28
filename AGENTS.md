@@ -9,6 +9,14 @@ Instructions for AI agents working on this project.
 - Run `mise run snapshot` after changing `.goreleaser.yaml` or anything that
   affects packaging, and inspect the archives in `dist/`.
 
+## Verified facts
+
+- Read `docs/verified-facts.md` before designing a verification. Reuse a
+  fact while its recheck condition does not apply instead of testing it again.
+- When a check establishes something a later change would otherwise need to
+  test again, add it there with its evidence and recheck condition. Move items
+  out of "Not verified yet" once they are verified.
+
 ## Code
 
 - The checks exist twice: in Go and in `scripts/cresclab-netcheck.bat`. Keep
