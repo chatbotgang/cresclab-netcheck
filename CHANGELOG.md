@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/chatbotgang/cresclab-netcheck/compare/v0.2.0...v0.2.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* ship the Apache 2.0 license with the source and releases ([#8](https://github.com/chatbotgang/cresclab-netcheck/issues/8)) ([9aa6c41](https://github.com/chatbotgang/cresclab-netcheck/commit/9aa6c4124101d0e87debf7cb7bc1810e1476c46e))
+
 ## [0.2.0](https://github.com/chatbotgang/cresclab-netcheck/compare/v0.1.0...v0.2.0) (2026-10-28)
 
 
