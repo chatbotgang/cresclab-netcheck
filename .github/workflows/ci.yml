@@ -80,6 +80,7 @@ jobs:
           for s in '==================== maac.cresclab.com' 'HTTP port 80' 'SNI comparison' 'MTU: ping' 'Repeated HTTPS requests' 'traceroute maac.cresclab.com' '==================== Summary'; do
             grep -qF "$s" "$report" || { echo "report misses: $s"; exit 1; }
           done
+          head -8 "$report" | grep -q '^Verdict: OK' || { echo 'verdict near the top is not OK'; head -8 "$report"; exit 1; }
           sed -n '/==== Summary/,$p' "$report"
 
   run-windows:

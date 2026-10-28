@@ -28,8 +28,7 @@ func newReport(name string, dirs []string) *report {
 			r.errs = append(r.errs, err.Error())
 			continue
 		}
-		// The byte order mark lets Notepad on older Windows detect UTF-8.
-		if _, err := f.WriteString("\xef\xbb\xbf"); err != nil {
+		if _, err := f.WriteString(utf8BOM); err != nil {
 			r.errs = append(r.errs, err.Error())
 			_ = f.Close()
 			continue
@@ -51,17 +50,18 @@ func (r *report) flush() {
 	}
 	chunk := r.String()[r.flushed:]
 	r.flushed += len(chunk)
-	if runtime.GOOS == "windows" {
-		chunk = strings.ReplaceAll(strings.ReplaceAll(chunk, "\r\n", "\n"), "\n", "\r\n")
-	}
-	if _, err := r.f.WriteString(chunk); err != nil {
+	if _, err := r.f.WriteString(platformNewlines(chunk)); err != nil {
 		r.errs = append(r.errs, err.Error())
 		return
 	}
 	_ = r.f.Sync()
 }
 
-func (r *report) close() (string, error) {
+// close finishes the report and rewrites it with the first placeholder
+// replaced, for example to put the verdict at the top. The rewrite goes
+// through a temporary file; if it fails, the progressively written report
+// stays as it is, still complete apart from the replacement.
+func (r *report) close(placeholder, replacement string) (string, error) {
 	if r.f == nil {
 		return "", errors.New(strings.Join(r.errs, "; "))
 	}
@@ -71,7 +71,27 @@ func (r *report) close() (string, error) {
 	if len(r.errs) > 0 {
 		return r.path, errors.New(strings.Join(r.errs, "; "))
 	}
+	final := utf8BOM + platformNewlines(strings.Replace(r.String(), placeholder, replacement, 1))
+	tmp := r.path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(final), 0o644); err != nil {
+		_ = os.Remove(tmp)
+		return r.path, nil
+	}
+	if err := os.Rename(tmp, r.path); err != nil {
+		_ = os.Remove(tmp)
+	}
 	return r.path, nil
+}
+
+// utf8BOM lets Notepad on older Windows detect UTF-8.
+const utf8BOM = "\xef\xbb\xbf"
+
+// platformNewlines uses CRLF on Windows so that Notepad shows line breaks.
+func platformNewlines(s string) string {
+	if runtime.GOOS != "windows" {
+		return s
+	}
+	return strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\n", "\r\n")
 }
 
 // outputDirs lists where the report may be saved, most convenient first. The

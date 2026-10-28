@@ -9,7 +9,7 @@ import (
 )
 
 func TestRunCheckRecoversFromPanic(t *testing.T) {
-	res := runCheck(check{"boom", func(tx *text) string {
+	res := runCheck(check{title: "boom", host: "maac.cresclab.com", run: func(tx *text) result {
 		tx.printf("partial output\n")
 		panic("unexpected")
 	}})
@@ -18,6 +18,10 @@ func TestRunCheckRecoversFromPanic(t *testing.T) {
 	}
 	if res.summary != "boom: check stopped unexpectedly" {
 		t.Errorf("summary = %q", res.summary)
+	}
+	// A crashed host check must still count against the verdict.
+	if res.host == nil || res.host.failure() != "did not finish" {
+		t.Errorf("host = %+v, want an unfinished result", res.host)
 	}
 }
 
@@ -29,7 +33,7 @@ func TestReportFallsBackToNextWritableDir(t *testing.T) {
 	r.flush()
 	r.printf("second\n")
 	r.flush()
-	path, err := r.close()
+	path, err := r.close("first", "FIRST")
 	if err != nil {
 		t.Fatalf("close: %v", err)
 	}
@@ -41,7 +45,7 @@ func TestReportFallsBackToNextWritableDir(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Windows writes CRLF line endings for Notepad, so compare line contents only.
-	if got, want := strings.ReplaceAll(string(b), "\r\n", "\n"), "\xef\xbb\xbffirst\nsecond\n"; got != want {
+	if got, want := strings.ReplaceAll(string(b), "\r\n", "\n"), "\xef\xbb\xbfFIRST\nsecond\n"; got != want {
 		t.Errorf("file = %q, want %q", got, want)
 	}
 }
@@ -50,7 +54,7 @@ func TestReportWithoutWritableDirReportsError(t *testing.T) {
 	r := newReport("report.txt", []string{filepath.Join(t.TempDir(), "missing")})
 	r.printf("kept in memory\n")
 	r.flush()
-	if _, err := r.close(); err == nil {
+	if _, err := r.close("", ""); err == nil {
 		t.Error("close returned nil error, want the create failure")
 	}
 }
