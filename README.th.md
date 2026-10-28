@@ -10,7 +10,7 @@
 
 ## ดาวน์โหลด
 
-ดาวน์โหลดจาก[เวอร์ชันล่าสุด](https://github.com/chatbotgang/cresclab-netcheck/releases/latest) repository นี้เป็นแบบ private จึงเปิดหน้า release ได้เฉพาะสมาชิกขององค์กร chatbotgang ให้ดาวน์โหลดไฟล์แล้วส่งให้ลูกค้าพร้อมกับ[คู่มือสำหรับลูกค้า](docs/customer-guide.zh-TW.md) (ภาษาจีนตัวเต็ม)
+ดาวน์โหลดจาก[เวอร์ชันล่าสุด](https://github.com/chatbotgang/cresclab-netcheck/releases/latest) หน้านี้เป็นแบบสาธารณะ ลูกค้าจึงดาวน์โหลดไฟล์เองได้ ให้ส่งลิงก์ให้ลูกค้าพร้อมกับ[คู่มือสำหรับลูกค้า](docs/customer-guide.zh-TW.md) (ภาษาจีนตัวเต็ม)
 
 แต่ละเวอร์ชันมีไฟล์บีบอัดสำหรับแต่ละแพลตฟอร์ม, ไฟล์ `cresclab-netcheck.bat` แยกต่างหาก และ `checksums.txt` ชื่อไฟล์บีบอัดอยู่ในรูปแบบ `cresclab-netcheck_<เวอร์ชัน>_<ระบบปฏิบัติการ>_<สถาปัตยกรรม>` ให้เลือกจากส่วนท้ายของชื่อไฟล์
 
@@ -107,3 +107,7 @@ mise run snapshot  # build and package every target into dist/
 - **CI** ทำงานในทุก pull request และทุกครั้งที่ push ไปที่ `main`: lint, unit test บน Linux, macOS และ Windows, บิลด์ snapshot ของทุกแพลตฟอร์ม และรันโปรแกรมที่บิลด์แล้วบน Linux, macOS และ Windows บน Windows ทั้ง `.bat` และ `.exe` จะถูกรันอีกครั้งบนเครือข่ายที่ Windows Firewall บล็อก IP ของ Cloudflare ที่ Crescendo Lab ใช้ เพื่อตรวจสอบว่าเส้นทางที่ล้มเหลวทำงานจนจบและรายงานได้ถูกต้อง
 - **การออกเวอร์ชัน**ใช้ [Conventional Commits](https://www.conventionalcommits.org/) release-please จะเปิด pull request สำหรับการออกเวอร์ชันค้างไว้บน `main` เมื่อ merge แล้ว จะสร้าง tag และ GitHub release จากนั้น GoReleaser จะอัปโหลดไฟล์บีบอัด, `.bat` แยกต่างหาก และ `checksums.txt` ใน workflow เดียวกัน pull request ที่ release-please เปิดใช้ `GITHUB_TOKEN` จึงไม่ทำให้ CI ทำงาน และแก้ไขเพียง `CHANGELOG.md` กับ manifest ของเวอร์ชันเท่านั้น
 - **Dependency:** Dependabot จะเปิด pull request ทุกสัปดาห์สำหรับ Go module และ GitHub Actions ส่วนเวอร์ชันของเครื่องมือใน `mise.toml` ต้องอัปเดตเอง
+
+## สัญญาอนุญาต
+
+ซอร์สโค้ดใช้สัญญาอนุญาต [Apache License 2.0](LICENSE) สัญญาอนุญาตนี้ไม่ครอบคลุมชื่อ Crescendo Lab, MAAC และ CAAC ดูรายละเอียดได้ที่ [NOTICE](NOTICE)

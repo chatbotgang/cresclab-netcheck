@@ -10,7 +10,7 @@
 
 ## 下載
 
-從[最新版本](https://github.com/chatbotgang/cresclab-netcheck/releases/latest)下載。這個 repo 是 private，只有 chatbotgang 組織的成員打得開 release 頁面；請下載檔案後，連同[客戶操作說明](docs/customer-guide.zh-TW.md)一起傳給客戶。
+從[最新版本](https://github.com/chatbotgang/cresclab-netcheck/releases/latest)下載。這個頁面是公開的，客戶可以自己下載；請把連結連同[客戶操作說明](docs/customer-guide.zh-TW.md)一起傳給客戶。
 
 每個版本都有各平台的壓縮檔、單獨的 `cresclab-netcheck.bat`，以及 `checksums.txt`。壓縮檔名稱的格式是 `cresclab-netcheck_<版本>_<作業系統>_<架構>`，請依檔名結尾挑選。
 
@@ -107,3 +107,7 @@ mise run snapshot  # build and package every target into dist/
 - **CI** 在每個 pull request 和 push 到 `main` 時執行：lint、在 Linux、macOS、Windows 上跑單元測試、建置所有平台的 snapshot，並在 Linux、macOS、Windows 上實際執行建置出來的程式。在 Windows 上，`.bat` 和 `.exe` 還會在 Windows 防火牆擋住漸強 Cloudflare IP 的網路上再跑一次，確認失敗的流程能跑完並正確回報。
 - **發版**採用 [Conventional Commits](https://www.conventionalcommits.org/)。release-please 會在 `main` 上維持一個 release pull request。merge 之後會打 tag、建立 GitHub release，接著在同一個 workflow 中由 GoReleaser 上傳壓縮檔、單獨的 `.bat` 和 `checksums.txt`。release-please 開的 pull request 使用 `GITHUB_TOKEN`，所以不會觸發 CI；這些 PR 只會修改 `CHANGELOG.md` 和版本 manifest。
 - **相依套件：** Dependabot 每週為 Go 模組和 GitHub Actions 開 pull request。`mise.toml` 中的工具版本需要手動更新。
+
+## 授權
+
+原始碼採用 [Apache License 2.0](LICENSE) 授權。授權範圍不包含 Crescendo Lab、MAAC、CAAC 等名稱，詳見 [NOTICE](NOTICE)。

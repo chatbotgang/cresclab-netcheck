@@ -14,9 +14,8 @@ The tool only reads information and changes no settings.
 
 Download from the
 [latest release](https://github.com/chatbotgang/cresclab-netcheck/releases/latest).
-The repository is private, so the release page opens only for members of the
-chatbotgang organization; download the file and send it to the customer together with the
-[customer guide](docs/customer-guide.zh-TW.md).
+The page is public, so customers can download the file themselves; send them
+the link together with the [customer guide](docs/customer-guide.zh-TW.md).
 
 Each release has an archive per platform, a standalone
 `cresclab-netcheck.bat`, and `checksums.txt`. Archive names follow
@@ -170,3 +169,9 @@ and `scripts/cresclab-netcheck.bat`. Keep the two in sync when DNS changes.
   run on them; they only change `CHANGELOG.md` and the version manifest.
 - **Dependencies:** Dependabot opens weekly pull requests for Go modules and
   GitHub Actions. Update the tool versions in `mise.toml` by hand.
+
+## License
+
+The source code is licensed under the [Apache License 2.0](LICENSE). The
+license does not cover the names Crescendo Lab, MAAC, and CAAC; see
+[NOTICE](NOTICE).
