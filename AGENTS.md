@@ -50,3 +50,10 @@ project. They are not changelogs.
   in Git history.
 - `docs/customer-guide.zh-TW.md` is sent to customers. Keep it in Traditional
   Chinese (Taiwan), short, and free of internal details.
+- `README.md` is the source; `README.zh-TW.md`, `README.ja.md`, and
+  `README.th.md` translate it. Change all four in the same pull request.
+  `TestReadmeTranslationsMatchStructure` fails when their headings, tables,
+  code blocks, or relative links differ.
+- For operating-system UI labels in a translation, use the vendor's localized
+  wording, such as Apple's support guide in that language, and record the
+  source in `docs/verified-facts.md`.

@@ -1,5 +1,7 @@
 # cresclab-netcheck
 
+English · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [ไทย](README.th.md)
+
 Network diagnostics for customers who cannot reach Crescendo Lab services such
 as MAAC and CAAC. A customer runs one program on the affected computer and
 network, and sends back a text report. The report shows where the connection
@@ -31,9 +33,35 @@ version that a customer's IT team can read before running. Prefer it when
 company policy blocks unsigned executables; the `.exe` is faster and adds a
 summary.
 
-The binaries are not code-signed. Windows SmartScreen asks the user to choose
-**More info → Run anyway**. On macOS, if the system refuses to open the
-binary, allow it in **System Settings → Privacy & Security → Open Anyway**.
+### Opening the program when the system blocks it
+
+The binaries are not code-signed, so Windows and macOS warn the first time a
+downloaded copy runs.
+
+**Windows:** when **Windows protected your PC** appears, click **More info**,
+then **Run anyway**. Company policy can hide **Run anyway**; in that case use
+the `.bat`, or ask the IT team to allow the program.
+
+**macOS 15 and later:**
+
+1. Double-click `cresclab-netcheck`. macOS reports that it cannot verify the
+   program; close the message without moving the file to the Trash.
+2. Choose **Apple menu → System Settings**, then click **Privacy & Security**
+   in the sidebar. You may need to scroll down.
+3. Go to **Security** and click **Open**.
+4. Click **Open Anyway**. The button is available for about an hour after
+   you try to open the program.
+5. Enter your login password and click **OK**. macOS then remembers the
+   exception, and the program opens with a double-click.
+
+These steps follow Apple's guide
+[Open a Mac app from an unknown developer](https://support.apple.com/guide/mac-help/mh40616/mac).
+For IT staff, removing the quarantine attribute in Terminal has the same
+effect:
+
+```bash
+xattr -d com.apple.quarantine cresclab-netcheck
+```
 
 ## What the report contains
 
