@@ -32,12 +32,16 @@ Instructions for AI agents working on this project.
   external command a timeout, record failures in the report, and keep panics
   inside `runCheck`.
 
-## Commits and releases
+## Commits, pull requests, and releases
 
 - Use Conventional Commits. release-please derives versions and the changelog
   from them, so `feat:` and `fix:` messages are user-facing release notes.
+- Pull requests are squash-merged, and the squash subject becomes the commit
+  on `main`. Follow the `cresclab-netcheck-pr` skill in
+  `.agents/skills/cresclab-netcheck-pr/` to open, merge, and release a change.
 - Do not create tags or GitHub releases by hand; merge the release-please pull
   request instead.
+- Skills live in `.agents/skills/`; `.claude/skills/` holds symlinks to them.
 
 ## Documentation
 
