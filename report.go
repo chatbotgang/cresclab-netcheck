@@ -31,7 +31,7 @@ func newReport(name string, dirs []string) *report {
 		// The byte order mark lets Notepad on older Windows detect UTF-8.
 		if _, err := f.WriteString("\xef\xbb\xbf"); err != nil {
 			r.errs = append(r.errs, err.Error())
-			f.Close()
+			_ = f.Close()
 			continue
 		}
 		// Failures in earlier locations were only fallback attempts.

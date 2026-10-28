@@ -5,7 +5,7 @@ rem Collects DNS, TCP/TLS/HTTP, MTU, and traceroute results for Crescendo Lab se
 rem into a text file on the Desktop. It only reads information and changes no settings.
 rem Every check has its own timeout, and a failed check never stops the later ones.
 
-set "VERSION=2026-10-27.2"
+set "VERSION=dev"
 set "SERVICE_HOSTS=maac.cresclab.com caac.cresclab.com api.cresclab.com api.caac.cresclab.com cdn.caac.cresclab.com"
 set "CONTROL_HOSTS=www.cloudflare.com www.google.com"
 set "TRACE_HOSTS=maac.cresclab.com api.cresclab.com www.cloudflare.com"
