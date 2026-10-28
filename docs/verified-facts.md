@@ -32,6 +32,14 @@ need to test again. Remove or update a fact when its recheck condition occurs.
 | macOS `ping -W` is in milliseconds; Linux iputils `ping -W` is in seconds. On a PPPoE line the router answers `ping -D -s 1472` with "frag needed and DF set (MTU 1492)". | Local macOS runs and `man ping`, 2026-10-28 | — |
 | A full `.exe` run takes about 1 minute on an open network; the `.bat` takes about 5 minutes because it runs sequentially and `tracert` waits on ICMP timeouts. | Windows CI runs, 2026-10-27 to 2026-10-28 | Timeouts or the check list change |
 
+## Operating-system prompts
+
+| Fact | Evidence | Recheck when |
+| --- | --- | --- |
+| The released macOS binaries are only ad-hoc signed by the Go linker (identifier `a.out`); `spctl --assess --type execute` rejects them, so a downloaded copy is blocked by Gatekeeper until the user chooses Open Anyway or removes `com.apple.quarantine`. | `spctl` and `codesign -dv` on the v0.2.0 `darwin_arm64` binary, 2026-10-28 | The binaries are signed with a Developer ID |
+| On macOS 15, 26, and 27 the steps are Apple menu → System Settings → Privacy & Security → Security → Open → Open Anyway → login password → OK, and Open Anyway stays available for about an hour. Localized labels: zh-TW 「隱私權與安全性」「打開」「強制打開」「好」; ja 「プライバシーとセキュリティ」「開く」「このまま開く」「OK」; th "ความเป็นส่วนตัวและความปลอดภัย" "เปิด" "ยืนยันจะเปิด". | Apple guide mh40616 in en, zh-tw, ja-jp, and th-th, versions 15.0, 26, and 27, 2026-10-28 | A new macOS release changes the guide |
+| Windows SmartScreen labels: en "Windows protected your PC" → More info → Run anyway; zh-TW 「Windows 已保護您的電腦」→「其他資訊」→「仍要執行」; ja 「Windows によって PC が保護されました」→「詳細情報」→「実行」. | [ASUS Taiwan FAQ](https://www.asus.com/tw/support/faq/1053651/), [Buffalo FAQ](https://www.buffalo.jp/support/faq/detail/124145337.html), 2026-10-28 | Windows changes the dialog |
+
 ## Toolchain
 
 | Fact | Evidence | Recheck when |
@@ -41,9 +49,12 @@ need to test again. Remove or update a fact when its recheck condition occurs.
 | A file written with LF line endings breaks `.bat` labels; generated or edited `.bat` content must be converted to CRLF and checked with `file`. | Prototype, 2026-10-27 | — |
 | An editor or tool may write a literal U+FEFF where Go source should contain the escape `"\xef\xbb\xbf"`; Go rejects it with "illegal byte order mark". | Prototype build, 2026-10-27 | — |
 
+| `gh run watch` can exit before the run finishes; check the run status again before treating its output as final. | PR #4 CI run 40619973173, 2026-10-28 | — |
+
 ## Not verified yet
 
 - Big5 (code page 950) output from `tracert` and `nslookup` converts to readable UTF-8 on Traditional Chinese Windows. Only English Windows runners have run the tools.
 - How long both tools take when a network silently drops packets instead of rejecting them. The `.bat` estimate of up to 12 minutes comes from its timeouts.
 - `windows_arm64`, `darwin_amd64`, and `linux_arm64` binaries run correctly; they are built but not executed.
 - The race detector on Windows: CI skips `-race` there on the assumption that it needs cgo.
+- The Thai SmartScreen labels "ข้อมูลเพิ่มเติม" and "เรียกใช้ต่อไป"; only a third-party article supports them, so `README.th.md` also shows the English labels.
