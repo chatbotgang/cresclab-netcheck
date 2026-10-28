@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type command struct {
@@ -39,8 +40,8 @@ func runCommandOK(name string, args ...string) (string, bool) {
 	return text, err == nil
 }
 
-func probeHost(t *text, host string, proxyURL *url.URL) string {
-	var status []string
+func probeHost(t *text, host string, proxyURL *url.URL) hostResult {
+	h := hostResult{host: host}
 
 	t.printf("--- DNS, system resolver\n")
 	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
@@ -48,10 +49,9 @@ func probeHost(t *text, host string, proxyURL *url.URL) string {
 	cancel()
 	if err != nil {
 		t.printf("ERROR: %v\n", err)
-		status = append(status, "dns=FAIL")
 	} else {
 		t.printf("%s\n", joinAddrs(addrs))
-		status = append(status, "dns=ok")
+		h.dnsOK = true
 	}
 	for _, server := range publicResolvers {
 		t.printf("--- DNS, %s\n%s\n", server, lookupVia(server, host))
@@ -60,43 +60,61 @@ func probeHost(t *text, host string, proxyURL *url.URL) string {
 	ping := pingCommand(host)
 	t.printf("--- ping\n%s", runCommand(ping.name, ping.args...))
 
+	// Up to two addresses per IP family, so a network without IPv6 does not
+	// hide the IPv4 results and the summary can tell the two apart.
 	t.printf("--- TCP connect to port 443\n")
-	tcpOK, tcpTried := 0, 0
+	tcp6NoRoute := 0
 	for _, a := range addrs {
-		if tcpTried == 4 {
-			break
+		v4 := a.IP.To4() != nil
+		if (v4 && h.tcp4Tried == 2) || (!v4 && h.tcp6Tried == 2) {
+			continue
 		}
-		line, ok := tcpConnect(a.IP)
+		line, err := tcpConnect(a.IP)
 		t.printf("%s\n", line)
-		tcpTried++
-		if ok {
-			tcpOK++
+		switch {
+		case v4:
+			h.tcp4Tried++
+			if err == nil {
+				h.tcp4OK++
+			}
+		default:
+			h.tcp6Tried++
+			if err == nil {
+				h.tcp6OK++
+			} else if noRoute(err) {
+				tcp6NoRoute++
+			}
 		}
 	}
-	if tcpTried == 0 {
+	h.tcp6NoRoute = h.tcp6Tried > 0 && tcp6NoRoute == h.tcp6Tried
+	if h.tcp4Tried+h.tcp6Tried == 0 {
 		t.printf("Skipped: no address from the system resolver\n")
 	}
-	status = append(status, fmt.Sprintf("tcp=%d/%d", tcpOK, tcpTried))
 
-	detail, tlsStatus := tlsHandshake(host)
+	var detail string
+	detail, h.tls = tlsHandshake(host)
 	t.printf("--- TLS handshake\n%s\n", detail)
-	status = append(status, "tls="+tlsStatus)
 
-	detail, httpsStatus := httpProbe("https://"+host+"/", probeOptions{})
+	detail, h.https = httpProbe("https://"+host+"/", probeOptions{})
 	t.printf("--- HTTPS GET, direct connection\n%s\n", detail)
-	status = append(status, "https="+httpsStatus)
 
 	if proxyURL != nil {
-		detail, proxyStatus := httpProbe("https://"+host+"/", probeOptions{proxy: proxyURL})
+		detail, h.httpsProxy = httpProbe("https://"+host+"/", probeOptions{proxy: proxyURL})
 		t.printf("--- HTTPS GET, through system proxy %s\n%s\n", proxyURL.Host, detail)
-		status = append(status, "https-via-proxy="+proxyStatus)
 	}
 
-	detail, plainStatus := plainHTTP("http://" + host + "/")
+	detail, h.http80 = plainHTTP("http://" + host + "/")
 	t.printf("--- HTTP port 80, first lines; a firewall block page shows up here\n%s\n", detail)
-	status = append(status, "http80="+plainStatus)
 
-	return host + ": " + strings.Join(status, " ")
+	return h
+}
+
+// noRoute reports whether a dial failed because the network has no route to
+// the address, as with IPv6 on an IPv4-only network. Windows reports this as
+// an "unreachable network" or "unreachable host".
+func noRoute(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no route") || strings.Contains(msg, "unreachable")
 }
 
 func joinAddrs(addrs []net.IPAddr) string {
@@ -124,16 +142,16 @@ func lookupVia(server, host string) string {
 	return joinAddrs(addrs)
 }
 
-func tcpConnect(ip net.IP) (string, bool) {
+func tcpConnect(ip net.IP) (string, error) {
 	addr := net.JoinHostPort(ip.String(), "443")
 	start := time.Now()
 	conn, err := net.DialTimeout("tcp", addr, dialTimeout)
 	elapsed := time.Since(start).Round(time.Millisecond)
 	if err != nil {
-		return fmt.Sprintf("%s FAILED after %s: %v", addr, elapsed, err), false
+		return fmt.Sprintf("%s FAILED after %s: %v", addr, elapsed, err), err
 	}
 	_ = conn.Close()
-	return fmt.Sprintf("%s OK in %s", addr, elapsed), true
+	return fmt.Sprintf("%s OK in %s", addr, elapsed), nil
 }
 
 // tlsHandshake reports the certificate the network actually presents. When a
@@ -251,14 +269,28 @@ func plainHTTP(target string) (string, string) {
 			fmt.Fprintf(&b, "%s: %s\n", h, v)
 		}
 	}
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1500))
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	if s := strings.TrimSpace(string(body)); s != "" {
-		fmt.Fprintf(&b, "\n%s\n", s)
+		fmt.Fprintf(&b, "\n%s\n", clip(s, http80BodyLimit))
 	}
 	return strings.TrimRight(b.String(), "\n"), fmt.Sprint(resp.StatusCode)
 }
 
-func cloudflareTraceCheck(t *text) string {
+// http80BodyLimit keeps a block page readable without printing a whole site.
+const http80BodyLimit = 300
+
+// clip shortens s to at most n bytes without splitting a UTF-8 character.
+func clip(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n] + " [truncated]"
+}
+
+func cloudflareTraceCheck(t *text) result {
 	summary := "Public IP: unknown"
 	for _, u := range cloudflareTrace {
 		client := &http.Client{Timeout: requestTimeout}
@@ -277,7 +309,7 @@ func cloudflareTraceCheck(t *text) string {
 			}
 		}
 	}
-	return summary
+	return result{summary: summary}
 }
 
 func traceFields(body string) map[string]string {
@@ -290,26 +322,28 @@ func traceFields(body string) map[string]string {
 	return fields
 }
 
-func sniCheck(t *text) string {
+func sniCheck(t *text) result {
 	t.printf("Any HTTP code, including 403, means the network path works. A timeout means it is blocked.\n")
 	t.printf("If only maac.cresclab.com fails on the same IP, the network filters by domain name.\n\n")
-	var failed []string
+	var failures []string
+	sni := sniResult{}
 	for _, ip := range sniIPs {
 		for _, name := range sniNames {
 			detail, status := httpProbe("https://"+name+"/cdn-cgi/trace", probeOptions{dialIP: ip})
 			t.printf("ip=%-15s sni=%-20s %s\n", ip, name, strings.ReplaceAll(detail, "\n", " | "))
-			if strings.HasPrefix(status, "FAIL") {
-				failed = append(failed, name+"@"+ip)
+			sni.set(ip, name, !failed(status))
+			if failed(status) {
+				failures = append(failures, name+"@"+ip)
 			}
 		}
 	}
-	if len(failed) == 0 {
-		return "SNI comparison: all reachable"
+	if len(failures) == 0 {
+		return result{summary: "SNI comparison: all reachable", sni: sni}
 	}
-	return "SNI comparison: failed " + strings.Join(failed, ", ")
+	return result{summary: "SNI comparison: failed " + strings.Join(failures, ", "), sni: sni}
 }
 
-func mtuCheck(t *text) string {
+func mtuCheck(t *text) result {
 	t.printf("1472 failing alone is normal on PPPoE lines such as HiNet fiber. If 1300 or 1200 fail\n")
 	t.printf("while plain ping works, large packets are dropped on the path and TLS can stall.\n")
 	t.printf("If no size gets replies, ICMP is blocked and this check says nothing.\n")
@@ -324,19 +358,19 @@ func mtuCheck(t *text) string {
 		}
 		status = append(status, fmt.Sprintf("%d=%s", size, mark))
 	}
-	return "MTU ping: " + strings.Join(status, " ")
+	return result{summary: "MTU ping: " + strings.Join(status, " ")}
 }
 
-func repeatCheck(t *text) string {
+func repeatCheck(t *text) result {
 	ok := 0
 	for i := 1; i <= repeatCount; i++ {
 		detail, status := httpProbe(repeatURL, probeOptions{})
 		t.printf("#%-2d %s\n", i, strings.ReplaceAll(detail, "\n", " | "))
-		if !strings.HasPrefix(status, "FAIL") {
+		if !failed(status) {
 			ok++
 		}
 	}
-	return fmt.Sprintf("Repeated HTTPS: %d/%d succeeded", ok, repeatCount)
+	return result{summary: fmt.Sprintf("Repeated HTTPS: %d/%d succeeded", ok, repeatCount)}
 }
 
 func since(start, event time.Time) string {

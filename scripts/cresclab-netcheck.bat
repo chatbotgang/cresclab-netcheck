@@ -64,8 +64,19 @@ if defined HAS_CURL (
   >>"%OUT%" echo Skipped: curl.exe not found
 )
 
-for %%H in (%SERVICE_HOSTS% %CONTROL_HOSTS%) do (
+rem :probe records hosts whose direct HTTPS request fails, for the verdict.
+set "SERVICE_FAILED="
+set /a CONTROL_FAILED=0
+set /a CONTROL_TOTAL=0
+set "PROBE_KIND=service"
+for %%H in (%SERVICE_HOSTS%) do (
   echo Checking %%H ...
+  call :probe %%H >>"%OUT%" 2>&1
+)
+set "PROBE_KIND=control"
+for %%H in (%CONTROL_HOSTS%) do (
+  echo Checking %%H ...
+  set /a CONTROL_TOTAL+=1
   call :probe %%H >>"%OUT%" 2>&1
 )
 
@@ -106,17 +117,32 @@ for %%H in (%TRACE_HOSTS%) do (
   call :trace %%H >>"%OUT%" 2>&1
 )
 
+if not defined HAS_CURL (
+  set "VERDICT=Verdict: not available because curl.exe was not found."
+) else if not defined SERVICE_FAILED (
+  set "VERDICT=Verdict: OK - every Crescendo Lab host responded over a direct HTTPS connection."
+) else if %CONTROL_FAILED% GEQ %CONTROL_TOTAL% (
+  set "VERDICT=Verdict: PROBLEM - the control hosts failed too, so this computer has no working internet access or needs a proxy that is not configured."
+) else (
+  set "VERDICT=Verdict: PROBLEM - direct HTTPS failed for%SERVICE_FAILED%. See the SNI comparison and HTTP port 80 sections."
+)
+
 call :log "Finished"
+>>"%OUT%" echo %VERDICT%
 >>"%OUT%" echo Local time: %DATE% %TIME%
 del "%HTTP_TMP%" >nul 2>&1
 
 rem cmd and the tools above write in the console code page, for example Big5 on
 rem Traditional Chinese Windows. Re-encode as UTF-8 so the file reads correctly anywhere.
 rem The original file is replaced only after the converted copy is complete.
+rem The same step puts the verdict at the top in place of the placeholder.
 set "NETCHECK_OUT=%OUT%"
-powershell -NoProfile -Command "$p=$env:NETCHECK_OUT; $t=[IO.File]::ReadAllText($p,[Console]::OutputEncoding); [IO.File]::WriteAllText($p+'.utf8',$t,(New-Object Text.UTF8Encoding $true)); Move-Item -LiteralPath ($p+'.utf8') -Destination $p -Force" >nul 2>&1
+set "NETCHECK_VERDICT=%VERDICT%"
+powershell -NoProfile -Command "$p=$env:NETCHECK_OUT; $t=[IO.File]::ReadAllText($p,[Console]::OutputEncoding); $t=$t.Replace('Verdict: not available yet; the check did not finish. See the sections below.', $env:NETCHECK_VERDICT); [IO.File]::WriteAllText($p+'.utf8',$t,(New-Object Text.UTF8Encoding $true)); Move-Item -LiteralPath ($p+'.utf8') -Destination $p -Force" >nul 2>&1
 if exist "%OUT%.utf8" del "%OUT%.utf8" >nul 2>&1
 
+echo.
+echo %VERDICT%
 echo.
 echo Done. Result file:
 echo   %OUT%
@@ -132,6 +158,8 @@ exit /b 0
 > "%OUT%" (
   echo Crescendo Lab network check - cresclab-netcheck.bat %VERSION%
   echo Local time: %DATE% %TIME%
+  echo.
+  echo Verdict: not available yet; the check did not finish. See the sections below.
   echo.
   echo This file contains network adapter settings from ipconfig /all, proxy settings,
   echo the public IP address seen by Cloudflare, and connection test results for
@@ -158,14 +186,23 @@ echo --- ping
 ping -n 4 -w 2000 %~1
 if not defined HAS_CURL goto :probe_powershell
 echo --- HTTPS, direct connection via curl
-curl.exe -sS -o NUL --ssl-no-revoke --connect-timeout 8 -m 12 -w "ip=%%{remote_ip} dns=%%{time_namelookup}s tcp=%%{time_connect}s tls=%%{time_appconnect}s ttfb=%%{time_starttransfer}s total=%%{time_total}s http=%%{http_code}\n" https://%~1/
+curl.exe -sS -o NUL --ssl-no-revoke --connect-timeout 8 -m 12 -w "ip=%%{remote_ip} dns=%%{time_namelookup}s tcp=%%{time_connect}s tls=%%{time_appconnect}s ttfb=%%{time_starttransfer}s total=%%{time_total}s http=%%{http_code}\n" https://%~1/ || call :https_failed %~1
 echo --- HTTP port 80, first lines; a firewall block page shows up here
 del "%HTTP_TMP%" >nul 2>&1
 curl.exe -sS -i --connect-timeout 8 -m 10 -o "%HTTP_TMP%" http://%~1/
-if exist "%HTTP_TMP%" powershell -NoProfile -Command "Get-Content -LiteralPath $env:HTTP_TMP -TotalCount 25" || type "%HTTP_TMP%"
+if exist "%HTTP_TMP%" powershell -NoProfile -Command "$t=[IO.File]::ReadAllText($env:HTTP_TMP); if ($t.Length -gt 800) { $t.Substring(0,800) + ' [truncated]' } else { $t }" || type "%HTTP_TMP%"
 :probe_powershell
 echo --- HTTPS, system proxy settings via PowerShell
 powershell -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $sw=[Diagnostics.Stopwatch]::StartNew(); try { $r=Invoke-WebRequest -Uri 'https://%~1/' -UseBasicParsing -TimeoutSec 12 -MaximumRedirection 0 -ErrorAction Stop; $s='HTTP ' + [int]$r.StatusCode } catch { if ($_.Exception.Response) { $s='HTTP ' + [int]$_.Exception.Response.StatusCode } else { $s='ERROR: ' + $_.Exception.Message } }; $s + ' elapsed=' + $sw.ElapsedMilliseconds + 'ms'"
+exit /b 0
+
+
+:https_failed
+if "%PROBE_KIND%"=="service" (
+  set "SERVICE_FAILED=%SERVICE_FAILED% %~1"
+) else (
+  set /a CONTROL_FAILED+=1
+)
 exit /b 0
 
 

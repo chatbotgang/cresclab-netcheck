@@ -44,19 +44,26 @@ soon as it is ready, so closing the window early still leaves partial results.
 
 | Section | What it tells you |
 | --- | --- |
+| Verdict (top of the report) | One line: every Crescendo Lab host answered, or which host failed at which step |
 | System, network adapters, DNS, proxy | Local configuration, including DNS servers and any manual proxy or PAC script |
 | Cloudflare trace | Public IP address and the Cloudflare location serving the customer |
 | Per host: DNS, ping, TCP, TLS, HTTPS | Which step fails for each Crescendo Lab host and for the control hosts `www.cloudflare.com` and `www.google.com` |
-| HTTP port 80 | A firewall block page, which usually names the vendor and the category |
+| HTTP port 80 | A firewall block page, which usually names the vendor and the category; long pages are truncated |
 | SNI comparison | Whether the network filters by domain name or by IP address |
 | MTU | Whether large packets are dropped on the path |
 | Repeated HTTPS requests | Whether failures are intermittent |
 | Traceroute | Where the route stops |
-| Summary (`.exe` only) | One line per host with `dns`, `tcp`, `tls`, `https`, and `http80` status |
+| Summary (`.exe` only) | One line per host with `dns`, `tcp4`, `tcp6`, `tls`, `https`, and `http80` status |
 
 ### Reading a report
 
-1. **SNI comparison** is the fastest discriminator:
+1. **Verdict** comes first. `OK` means every Crescendo Lab host answered over
+   HTTPS; any HTTP status counts as an answer. `PROBLEM` names the failing
+   host and step. The `.exe` also counts an answer through the system proxy,
+   names the step (DNS, TCP connect, TLS, or HTTPS), and adds what the SNI
+   comparison shows; the `.bat` judges the direct connection only. A report
+   that still says "not available yet" was closed before it finished.
+2. **SNI comparison** is the fastest discriminator:
    - Only `maac.cresclab.com` fails on `104.18.4.188` while
      `www.cloudflare.com` works on the same IP: the company firewall filters
      by domain name. Ask the customer's IT team to allow `*.cresclab.com`.
@@ -64,19 +71,25 @@ soon as it is ready, so closing the window early still leaves partial results.
      or route is blocked.
    - Everything fails, including the control hosts: the computer has no
      working internet access or needs a proxy that is not configured.
-2. **HTTPS timing** marks a step that never happened with `-`. For example,
+3. **HTTPS timing** marks a step that never happened with `-`. For example,
    `tcp=30ms tls=-` means TCP connected and the TLS handshake stalled.
-3. **TLS issuer** other than a public CA, such as the company's own CA, means
+4. **TLS issuer** other than a public CA, such as the company's own CA, means
    a firewall intercepts HTTPS.
-4. **MTU:** a missing reply for `1472` alone is normal on PPPoE lines such as
+5. **MTU:** a missing reply for `1472` alone is normal on PPPoE lines such as
    HiNet fiber. Missing replies for `1300` or `1200` while plain ping works
    mean large packets are dropped.
-5. **Traceroute and ping** showing only timeouts usually mean the network
+6. **Traceroute and ping** showing only timeouts usually mean the network
    blocks ICMP, not that the site is down. Rely on the TCP and HTTPS results
    instead.
 
-`http80` fails on the `api` and `cdn` hosts by design because they do not
-serve port 80.
+Two summary results are expected and need no action: `http80` fails on the
+`api` and `cdn` hosts because they do not serve port 80, and
+`tcp6=0/2(no-route)` means the network has no IPv6, which browsers handle by
+using IPv4.
+
+[Verified facts](docs/verified-facts.md) records behavior that has already
+been checked, such as how CI runners and Windows Firewall behave, so it does
+not need to be verified again.
 
 ## Development
 
