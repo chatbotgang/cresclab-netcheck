@@ -1,13 +1,18 @@
-param([Parameter(Mandatory)][ValidateSet('open', 'blocked')][string]$Phase)
+# Runs the packaged .bat and .exe from $Dir and checks their reports. With
+# -Phase blocked, also checks that the reports show the blocked Cloudflare IPs.
+param(
+  [Parameter(Mandatory)][ValidateSet('open', 'blocked')][string]$Phase,
+  [Parameter(Mandatory)][string]$Dir
+)
 $ErrorActionPreference = 'Stop'
 $desktop = [Environment]::GetFolderPath('Desktop')
 $out = New-Item -ItemType Directory -Force "reports/$Phase"
 $required = @('==================== maac.cresclab.com', 'HTTP port 80', 'SNI comparison', 'ip=104.18.4.188', 'MTU: ping', 'Repeated HTTPS requests', 'traceroute maac.cresclab.com')
 
-foreach ($tool in @('cresclab-netcheck.bat', 'dist\cresclab-netcheck.exe')) {
+foreach ($tool in @('cresclab-netcheck.bat', 'cresclab-netcheck.exe')) {
   Get-ChildItem $desktop -Filter 'cresclab-netcheck-*.txt' | Remove-Item
   $sw = [Diagnostics.Stopwatch]::StartNew()
-  cmd /c "echo.| $tool" | Out-Host
+  cmd /c "echo.| `"$(Join-Path $Dir $tool)`"" | Out-Host
   Write-Host "### $Phase $tool took $($sw.Elapsed)"
   $files = @(Get-ChildItem $desktop -Filter 'cresclab-netcheck-*.txt')
   if ($files.Count -ne 1) { throw "$tool produced $($files.Count) reports" }
@@ -17,9 +22,10 @@ foreach ($tool in @('cresclab-netcheck.bat', 'dist\cresclab-netcheck.exe')) {
   $text = [IO.File]::ReadAllText($f.FullName)
   foreach ($r in $required) { if (-not $text.Contains($r)) { throw "$tool report misses '$r'" } }
   if ($text -match 'is not recognized as an internal or external command') { throw "$tool report contains a cmd error" }
+  if ($text -match '- cresclab-netcheck(\.bat)? dev\b') { throw "$tool report has no release version" }
   if ($Phase -eq 'blocked' -and $tool -like '*.exe' -and $text -notmatch 'maac\.cresclab\.com: dns=ok tcp=0/') { throw 'exe report does not show maac as blocked' }
   if ($Phase -eq 'blocked' -and $tool -like '*.bat' -and $text -notmatch 'ip=104\.18\.4\.188 sni=maac\.cresclab\.com tcp=0\.0+s') { throw 'bat report does not show maac as blocked' }
-  Copy-Item $f.FullName (Join-Path $out ("{0}-{1}" -f (Split-Path $tool -Leaf), $f.Name))
+  Copy-Item $f.FullName (Join-Path $out "$tool-$($f.Name)")
   Write-Host "===== $($f.Name) ($($bytes.Length) bytes)"
   Write-Host $text
 }

@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: cresclab-netcheck
+
+before:
+  hooks:
+    # GoReleaser OSS cannot template archive files, so render the .bat with the
+    # release version into build/, which is ignored by Git.
+    - sh -c 'mkdir -p build && sed "s/^set \"VERSION=dev\"/set \"VERSION={{ .Version }}\"/" scripts/cresclab-netcheck.bat > build/cresclab-netcheck.bat'
+
+builds:
+  - &build
+    id: windows
+    goos: [windows]
+    goarch: [amd64, arm64]
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version={{ .Version }}"]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+  - <<: *build
+    id: unix
+    goos: [darwin, linux]
+
+archives:
+  - id: windows
+    ids: [windows]
+    formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - docs/customer-guide.zh-TW.md
+      - src: build/cresclab-netcheck.bat
+        strip_parent: true
+  - id: unix
+    ids: [unix]
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - docs/customer-guide.zh-TW.md
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  # release-please creates the release and its notes; GoReleaser only adds assets.
+  mode: keep-existing
+  extra_files:
+    - glob: build/cresclab-netcheck.bat
+
+changelog:
+  disable: true
