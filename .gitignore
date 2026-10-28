@@ -1,2 +1,5 @@
 dist/
 build/
+# go build in the repository root writes the binary here.
+/cresclab-netcheck
+/cresclab-netcheck.exe

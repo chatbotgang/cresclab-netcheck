@@ -47,6 +47,7 @@ need to test again. Remove or update a fact when its recheck condition occurs.
 | --- | --- | --- |
 | GoReleaser OSS cannot template archive files (`templated_files` is Pro only), so a `before` hook renders the `.bat` version into `build/`. | GoReleaser docs, `customization/package/archives.md`, v2.19.0 | Moving to GoReleaser Pro |
 | release-please proposes 1.0.0 for a first release from manifest `0.0.0` unless `initial-version` is set. | Release PR #2 before and after PR #3, 2026-10-28 | — |
+| `go build ./...` in the repository root writes a `cresclab-netcheck` binary there, because the module has a single main package. `.gitignore` excludes it after one was committed by accident in 2ee5181. | Local build, 2026-10-28 | — |
 | A file written with LF line endings breaks `.bat` labels; generated or edited `.bat` content must be converted to CRLF and checked with `file`. | Prototype, 2026-10-27 | — |
 | An editor or tool may write a literal U+FEFF where Go source should contain the escape `"\xef\xbb\xbf"`; Go rejects it with "illegal byte order mark". | Prototype build, 2026-10-27 | — |
 
