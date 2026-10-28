@@ -10,20 +10,26 @@
 
 ## ดาวน์โหลด
 
-- **สำหรับลูกค้า:** แชร์โฟลเดอร์ Google Drive สาธารณะ
-  [Crescendo Lab Network Check](https://drive.google.com/drive/folders/1qz-rjwxXQvT64_adtLXW_M_-na3qmn4e?usp=sharing)
-  พร้อมกับ[คู่มือสำหรับลูกค้า](docs/customer-guide.zh-TW.md) (ภาษาจีนตัวเต็ม)
-- **ทุกเวอร์ชัน:** [GitHub Releases](https://github.com/chatbotgang/cresclab-netcheck/releases)
-  มีไฟล์บีบอัดสำหรับแต่ละแพลตฟอร์ม, ไฟล์ `cresclab-netcheck.bat` แยกต่างหาก และ `checksums.txt`
+ดาวน์โหลดจาก[เวอร์ชันล่าสุด](https://github.com/chatbotgang/cresclab-netcheck/releases/latest) repository นี้เป็นแบบ private จึงเปิดหน้า release ได้เฉพาะสมาชิกขององค์กร chatbotgang ให้ดาวน์โหลดไฟล์แล้วส่งให้ลูกค้าพร้อมกับ[คู่มือสำหรับลูกค้า](docs/customer-guide.zh-TW.md) (ภาษาจีนตัวเต็ม)
 
-| แพลตฟอร์ม | ไฟล์บีบอัด | บิลด์ | รันจริงใน CI |
+แต่ละเวอร์ชันมีไฟล์บีบอัดสำหรับแต่ละแพลตฟอร์ม, ไฟล์ `cresclab-netcheck.bat` แยกต่างหาก และ `checksums.txt` ชื่อไฟล์บีบอัดอยู่ในรูปแบบ `cresclab-netcheck_<เวอร์ชัน>_<ระบบปฏิบัติการ>_<สถาปัตยกรรม>` ให้เลือกจากส่วนท้ายของชื่อไฟล์
+
+### วิธีเลือกไฟล์
+
+| คอมพิวเตอร์ | ชื่อไฟล์ลงท้ายด้วย | บิลด์ | รันจริงใน CI |
 | --- | --- | --- | --- |
-| Windows x64 | `windows_amd64.zip` | ✓ | ✓ เครือข่ายปกติและเครือข่ายที่ถูกบล็อก |
-| Windows ARM64 | `windows_arm64.zip` | ✓ | — |
-| macOS ชิป Apple | `darwin_arm64.tar.gz` | ✓ | ✓ |
-| macOS Intel | `darwin_amd64.tar.gz` | ✓ | — |
-| Linux x64 | `linux_amd64.tar.gz` | ✓ | ✓ |
-| Linux ARM64 | `linux_arm64.tar.gz` | ✓ | — |
+| Windows ที่ใช้ Intel หรือ AMD (คอมพิวเตอร์ส่วนใหญ่) | `_windows_amd64.zip` | ✓ | ✓ เครือข่ายปกติและเครือข่ายที่ถูกบล็อก |
+| Windows ที่ใช้ Arm เช่น โน้ตบุ๊ก Snapdragon | `_windows_arm64.zip` | ✓ | — |
+| Mac ที่ใช้ชิป Apple (ซีรีส์ M) | `_darwin_arm64.tar.gz` | ✓ | ✓ |
+| Mac ที่ใช้โปรเซสเซอร์ Intel | `_darwin_amd64.tar.gz` | ✓ | — |
+| Linux ที่ใช้ Intel หรือ AMD | `_linux_amd64.tar.gz` | ✓ | ✓ |
+| Linux ที่ใช้ Arm | `_linux_arm64.tar.gz` | ✓ | — |
+
+`amd64` หมายถึงโปรเซสเซอร์ Intel หรือ AMD แบบ 64 บิต (เรียกอีกอย่างว่า x64 หรือ x86-64) ส่วน `arm64` หมายถึงโปรเซสเซอร์ Arm แบบ 64 บิต
+
+- **Windows:** กด Windows+R พิมพ์ `ms-settings:about` แล้วดูข้อมูลโปรเซสเซอร์ใต้ **ข้อมูลจําเพาะของอุปกรณ์** หากมี `x64` ให้เลือก `windows_amd64` หากมี `ARM` ให้เลือก `windows_arm64` หรือรัน `$env:PROCESSOR_ARCHITECTURE` ใน PowerShell ซึ่งจะแสดง `AMD64` หรือ `ARM64` หากไม่แน่ใจ ให้เลือก `windows_amd64` เพราะ Windows 11 on Arm รันโปรแกรม x64 ได้ผ่านการจำลอง
+- **macOS:** เลือก **เมนู Apple** > **เกี่ยวกับ Mac เครื่องนี้** หากแสดง **ชิป** ตามด้วยชิป Apple M ให้เลือก `darwin_arm64` หากแสดง **โปรเซสเซอร์** ตามด้วยโปรเซสเซอร์ Intel ให้เลือก `darwin_amd64`
+- **Linux:** `uname -m` แสดง `x86_64` ให้เลือก `linux_amd64` และแสดง `aarch64` หรือ `arm64` ให้เลือก `linux_arm64`
 
 ไฟล์บีบอัดสำหรับ Windows มี `cresclab-netcheck.bat` ด้วย ซึ่งเป็นเวอร์ชันข้อความธรรมดาที่ทีม IT ของลูกค้าเปิดอ่านได้ก่อนรัน หากนโยบายของบริษัทบล็อกไฟล์ปฏิบัติการที่ไม่มีลายเซ็น ให้ใช้ไฟล์นี้แทน ส่วน `.exe` ทำงานเร็วกว่าและมีส่วนสรุปเพิ่มเติม
 
@@ -100,5 +106,4 @@ mise run snapshot  # build and package every target into dist/
 
 - **CI** ทำงานในทุก pull request และทุกครั้งที่ push ไปที่ `main`: lint, unit test บน Linux, macOS และ Windows, บิลด์ snapshot ของทุกแพลตฟอร์ม และรันโปรแกรมที่บิลด์แล้วบน Linux, macOS และ Windows บน Windows ทั้ง `.bat` และ `.exe` จะถูกรันอีกครั้งบนเครือข่ายที่ Windows Firewall บล็อก IP ของ Cloudflare ที่ Crescendo Lab ใช้ เพื่อตรวจสอบว่าเส้นทางที่ล้มเหลวทำงานจนจบและรายงานได้ถูกต้อง
 - **การออกเวอร์ชัน**ใช้ [Conventional Commits](https://www.conventionalcommits.org/) release-please จะเปิด pull request สำหรับการออกเวอร์ชันค้างไว้บน `main` เมื่อ merge แล้ว จะสร้าง tag และ GitHub release จากนั้น GoReleaser จะอัปโหลดไฟล์บีบอัด, `.bat` แยกต่างหาก และ `checksums.txt` ใน workflow เดียวกัน pull request ที่ release-please เปิดใช้ `GITHUB_TOKEN` จึงไม่ทำให้ CI ทำงาน และแก้ไขเพียง `CHANGELOG.md` กับ manifest ของเวอร์ชันเท่านั้น
-- หลังออกเวอร์ชัน ให้แทนที่ไฟล์ในโฟลเดอร์ Google Drive ด้วย `cresclab-netcheck.bat` ตัวใหม่ และ `.exe` จาก `windows_amd64.zip`
 - **Dependency:** Dependabot จะเปิด pull request ทุกสัปดาห์สำหรับ Go module และ GitHub Actions ส่วนเวอร์ชันของเครื่องมือใน `mise.toml` ต้องอัปเดตเอง

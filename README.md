@@ -12,21 +12,40 @@ The tool only reads information and changes no settings.
 
 ## Downloads
 
-- **Customers:** share the public Google Drive folder
-  [Crescendo Lab Network Check](https://drive.google.com/drive/folders/1qz-rjwxXQvT64_adtLXW_M_-na3qmn4e?usp=sharing)
-  together with the [customer guide](docs/customer-guide.zh-TW.md).
-- **Every release:** [GitHub Releases](https://github.com/chatbotgang/cresclab-netcheck/releases)
-  has an archive per platform, a standalone `cresclab-netcheck.bat`, and
-  `checksums.txt`.
+Download from the
+[latest release](https://github.com/chatbotgang/cresclab-netcheck/releases/latest).
+The repository is private, so the release page opens only for members of the
+chatbotgang organization; download the file and send it to the customer together with the
+[customer guide](docs/customer-guide.zh-TW.md).
 
-| Platform | Archive | Built | Executed in CI |
+Each release has an archive per platform, a standalone
+`cresclab-netcheck.bat`, and `checksums.txt`. Archive names follow
+`cresclab-netcheck_<version>_<os>_<arch>`, so choose by how the name ends.
+
+### Choosing the file
+
+| Computer | File name ends with | Built | Executed in CI |
 | --- | --- | --- | --- |
-| Windows x64 | `windows_amd64.zip` | ✓ | ✓ open and blocked network |
-| Windows ARM64 | `windows_arm64.zip` | ✓ | — |
-| macOS Apple Silicon | `darwin_arm64.tar.gz` | ✓ | ✓ |
-| macOS Intel | `darwin_amd64.tar.gz` | ✓ | — |
-| Linux x64 | `linux_amd64.tar.gz` | ✓ | ✓ |
-| Linux ARM64 | `linux_arm64.tar.gz` | ✓ | — |
+| Windows on Intel or AMD (most PCs) | `_windows_amd64.zip` | ✓ | ✓ open and blocked network |
+| Windows on Arm, such as Snapdragon laptops | `_windows_arm64.zip` | ✓ | — |
+| Mac with Apple silicon (M series) | `_darwin_arm64.tar.gz` | ✓ | ✓ |
+| Mac with an Intel processor | `_darwin_amd64.tar.gz` | ✓ | — |
+| Linux on Intel or AMD | `_linux_amd64.tar.gz` | ✓ | ✓ |
+| Linux on Arm | `_linux_arm64.tar.gz` | ✓ | — |
+
+`amd64` means a 64-bit Intel or AMD processor, also called x64 or x86-64.
+`arm64` means a 64-bit Arm processor.
+
+- **Windows:** press Windows+R, enter `ms-settings:about`, and look at the
+  processor details under **Device specifications**: `x64` means
+  `windows_amd64`, `ARM` means `windows_arm64`. In PowerShell,
+  `$env:PROCESSOR_ARCHITECTURE` prints `AMD64` or `ARM64`. When unsure, take
+  `windows_amd64`; Windows 11 on Arm runs x64 programs through emulation.
+- **macOS:** choose **Apple menu → About This Mac**. **Chip** followed by an
+  Apple M chip means `darwin_arm64`; **Processor** followed by an Intel
+  processor means `darwin_amd64`.
+- **Linux:** `uname -m` prints `x86_64` for `linux_amd64`, and `aarch64` or
+  `arm64` for `linux_arm64`.
 
 The Windows archive also contains `cresclab-netcheck.bat`, a plain-text
 version that a customer's IT team can read before running. Prefer it when
@@ -149,7 +168,5 @@ and `scripts/cresclab-netcheck.bat`. Keep the two in sync when DNS changes.
   archives, the standalone `.bat`, and `checksums.txt` in the same workflow.
   Pull requests opened by release-please use `GITHUB_TOKEN`, so CI does not
   run on them; they only change `CHANGELOG.md` and the version manifest.
-- After a release, replace the files in the Google Drive folder with the new
-  `cresclab-netcheck.bat` and the `.exe` from `windows_amd64.zip`.
 - **Dependencies:** Dependabot opens weekly pull requests for Go modules and
   GitHub Actions. Update the tool versions in `mise.toml` by hand.

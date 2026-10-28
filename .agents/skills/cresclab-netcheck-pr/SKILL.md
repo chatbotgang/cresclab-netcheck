@@ -154,9 +154,3 @@ request titled `chore(main): release <version>`.
    checksum OK; and the `.bat` version equal to the release version.
 
 Do not create tags or releases by hand.
-
-### 9. After a release
-
-The public Google Drive folder that customers download from is updated by
-hand. Replacing its files changes what customers receive, so ask the user
-before touching it.
