@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+      - run: mise run lint
+
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+        with:
+          install_args: go
+      # The race detector needs cgo, which the Windows runner does not set up.
+      - run: go test ${{ runner.os != 'Windows' && '-race' || '' }} ./...
+
+  snapshot:
+    name: Build every target
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: jdx/mise-action@v5
+      - run: mise run snapshot
+      - uses: actions/upload-artifact@v7
+        with:
+          name: snapshot
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/checksums.txt
+
+  run-unix:
+    name: Run binary (${{ matrix.target }})
+    needs: snapshot
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux_amd64
+          - os: macos-latest
+            target: darwin_arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: snapshot
+      - name: Run and check the report
+        run: |
+          mkdir run && tar xzf cresclab-netcheck_*_${{ matrix.target }}.tar.gz -C run
+          cd run
+          echo | ./cresclab-netcheck
+          report=$(find "$HOME/Desktop" . -maxdepth 1 -name 'cresclab-netcheck-*.txt' 2>/dev/null | head -1)
+          test -n "$report"
+          for s in '==================== maac.cresclab.com' 'HTTP port 80' 'SNI comparison' 'MTU: ping' 'Repeated HTTPS requests' 'traceroute maac.cresclab.com' '==================== Summary'; do
+            grep -qF "$s" "$report" || { echo "report misses: $s"; exit 1; }
+          done
+          sed -n '/==== Summary/,$p' "$report"
+
+  run-windows:
+    name: Run .bat and .exe (windows_amd64)
+    needs: snapshot
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: snapshot
+      - name: Extract the Windows archive
+        shell: pwsh
+        run: Expand-Archive (Get-Item cresclab-netcheck_*_windows_amd64.zip) -DestinationPath run
+      - name: Run on an open network
+        shell: pwsh
+        run: ./.github/scripts/run-and-verify.ps1 -Phase open -Dir run
+      - name: Block the Crescendo Lab Cloudflare IPs
+        shell: pwsh
+        run: |
+          Set-NetFirewallProfile -All -Enabled True
+          New-NetFirewallRule -DisplayName block-cresclab -Direction Outbound -RemoteAddress 104.18.4.188,104.18.5.188 -Action Block | Out-Null
+      - name: Run on a blocked network
+        shell: pwsh
+        run: ./.github/scripts/run-and-verify.ps1 -Phase blocked -Dir run
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: windows-reports
+          path: reports/
