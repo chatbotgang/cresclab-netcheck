@@ -132,7 +132,7 @@ func tcpConnect(ip net.IP) (string, bool) {
 	if err != nil {
 		return fmt.Sprintf("%s FAILED after %s: %v", addr, elapsed, err), false
 	}
-	conn.Close()
+	_ = conn.Close()
 	return fmt.Sprintf("%s OK in %s", addr, elapsed), true
 }
 
@@ -146,7 +146,7 @@ func tlsHandshake(host string) (string, string) {
 	start := time.Now()
 	conn, err := tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{ServerName: host})
 	if err == nil {
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		return describeTLS(conn, time.Since(start), "verified"), "ok"
 	}
 	failure := fmt.Sprintf("FAILED after %s: %v", time.Since(start).Round(time.Millisecond), err)
@@ -159,7 +159,7 @@ func tlsHandshake(host string) (string, string) {
 	if err != nil {
 		return failure, "FAIL(untrusted-cert)"
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	return failure + "\n" + describeTLS(conn, time.Since(start), "NOT trusted by this computer"), "FAIL(untrusted-cert)"
 }
 
@@ -227,7 +227,7 @@ func httpProbe(target string, opts probeOptions) (string, string) {
 		return "ERROR: " + err.Error() + "\n" + timing, "FAIL(" + errKind(err) + ")"
 	}
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	return fmt.Sprintf("HTTP %d %s\n%s", resp.StatusCode, resp.Proto, timing), fmt.Sprint(resp.StatusCode)
 }
 
@@ -243,7 +243,7 @@ func plainHTTP(target string) (string, string) {
 	if err != nil {
 		return "ERROR: " + err.Error(), "FAIL(" + errKind(err) + ")"
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var b strings.Builder
 	fmt.Fprintf(&b, "HTTP %d %s\n", resp.StatusCode, resp.Proto)
 	for _, h := range []string{"Server", "Location", "Content-Type", "Via", "X-Cache"} {
@@ -268,7 +268,7 @@ func cloudflareTraceCheck(t *text) string {
 			continue
 		}
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		t.printf("--- %s\nHTTP %d\n%s\n", u, resp.StatusCode, strings.TrimSpace(string(body)))
 		if summary == "Public IP: unknown" {
 			fields := traceFields(string(body))

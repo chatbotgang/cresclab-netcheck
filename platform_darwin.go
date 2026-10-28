@@ -1,24 +1,26 @@
-//go:build !windows
+//go:build darwin
 
-// This file lets the program run on macOS and Linux for development.
 package main
 
 import (
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 )
 
-func consoleCodePage() uint32 { return 65001 }
-
 func systemCommands() []command {
 	return []command{
-		{"System", "uname", []string{"-a"}},
-		{"Network adapters", "ifconfig", nil},
+		{"System", "sw_vers", nil},
+		{"Network interfaces: ifconfig", "ifconfig", nil},
+		{"DNS configuration: scutil --dns", "scutil", []string{"--dns"}},
+		{"Proxy settings: scutil --proxy", "scutil", []string{"--proxy"}},
+		{"Routing table", "netstat", []string{"-rn", "-f", "inet"}},
 	}
 }
 
+// macOS ping takes -W in milliseconds.
 func pingCommand(host string) command {
 	return command{name: "ping", args: []string{"-c", "4", "-W", "2000", host}}
 }
@@ -32,7 +34,11 @@ func traceCommand(host string) command {
 }
 
 func systemProxy() (*url.URL, string) {
-	return nil, "System proxy detection is only implemented on Windows."
+	out, err := exec.Command("scutil", "--proxy").Output()
+	if err != nil {
+		return nil, "Could not read proxy settings: " + err.Error()
+	}
+	return parseScutilProxy(string(out))
 }
 
 func desktopDir() string {
@@ -43,4 +49,6 @@ func desktopDir() string {
 	return filepath.Join(home, "Desktop")
 }
 
-func revealFile(string) {}
+func revealFile(path string) {
+	_ = exec.Command("open", "-R", path).Start()
+}

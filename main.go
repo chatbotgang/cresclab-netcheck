@@ -19,7 +19,8 @@ import (
 	"time"
 )
 
-const version = "2026-10-27.2"
+// version is set at release time with -ldflags "-X main.version=...".
+var version = "dev"
 
 var (
 	serviceHosts    = []string{"maac.cresclab.com", "caac.cresclab.com", "api.cresclab.com", "api.caac.cresclab.com", "cdn.caac.cresclab.com"}
@@ -64,11 +65,11 @@ func main() {
 	fmt.Println()
 
 	r := newReport("cresclab-netcheck-"+start.Format("20060102-150405")+".txt", outputDirs())
-	r.printf("Crescendo Lab network check - cresclab-netcheck.exe %s\n", version)
+	r.printf("Crescendo Lab network check - cresclab-netcheck %s\n", version)
 	r.printf("Local time: %s\n", start.Format("2006-01-02 15:04:05 -0700"))
 	r.printf("UTC time:   %s\n", start.UTC().Format("2006-01-02 15:04:05"))
 	r.printf("OS: %s/%s\n\n", runtime.GOOS, runtime.GOARCH)
-	r.printf("This file contains network adapter settings from ipconfig /all, proxy settings,\n")
+	r.printf("This file contains network adapter settings, DNS and proxy settings,\n")
 	r.printf("the public IP address seen by Cloudflare, and connection test results for\n")
 	r.printf("Crescendo Lab services. The program changes no settings.\n")
 	r.flush()
