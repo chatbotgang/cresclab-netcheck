@@ -41,6 +41,8 @@ need to test again. Remove or update a fact when its recheck condition occurs.
 | On macOS 15, 26, and 27 the steps are Apple menu → System Settings → Privacy & Security → Security → Open → Open Anyway → login password → OK, and Open Anyway stays available for about an hour. Localized labels: zh-TW 「隱私權與安全性」「打開」「強制打開」「好」; ja 「プライバシーとセキュリティ」「開く」「このまま開く」「OK」; th "ความเป็นส่วนตัวและความปลอดภัย" "เปิด" "ยืนยันจะเปิด". | Apple guide mh40616 in en, zh-tw, ja-jp, and th-th, versions 15.0, 26, and 27, 2026-10-28 | A new macOS release changes the guide |
 | Windows SmartScreen labels: en "Windows protected your PC" → More info → Run anyway; zh-TW 「Windows 已保護您的電腦」→「其他資訊」→「仍要執行」; ja 「Windows によって PC が保護されました」→「詳細情報」→「実行」. | [ASUS Taiwan FAQ](https://www.asus.com/tw/support/faq/1053651/), [Buffalo FAQ](https://www.buffalo.jp/support/faq/detail/124145337.html), 2026-10-28 | Windows changes the dialog |
 
+| Windows: `ms-settings:about` opens Settings → System → About, whose **Device specifications** show the processor type; Windows 11 on Arm runs x64 programs through emulation, while Windows 10 on Arm emulates only x86. macOS: About This Mac shows **Chip** on Apple silicon and **Processor** on Intel (zh-TW 「關於這台 Mac」「晶片」「處理器」; ja 「このMacについて」「チップ」「プロセッサ」; th "เกี่ยวกับ Mac เครื่องนี้" "ชิป" "โปรเซสเซอร์"). | Microsoft support "Which version of Windows operating system am I running?" and Learn "How emulation works on Arm"; Apple support 116943 in en, zh-tw, ja-jp, th-th; 2026-10-28 | Vendors change the settings pages |
+
 ## Toolchain
 
 | Fact | Evidence | Recheck when |
