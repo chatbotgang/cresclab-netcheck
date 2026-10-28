@@ -1,0 +1,49 @@
+# Verified facts
+
+Behavior that has been checked against real systems. Reuse a fact instead of
+verifying it again while its **Recheck when** condition does not apply. Each
+fact names its evidence; dates are Asia/Taipei.
+
+Add a fact when a check establishes something a later change would otherwise
+need to test again. Remove or update a fact when its recheck condition occurs.
+
+## CI runners
+
+| Fact | Evidence | Recheck when |
+| --- | --- | --- |
+| GitHub-hosted Windows runners drop outbound ICMP: every `ping` and `tracert` hop times out. CI cannot validate MTU or traceroute content, only that those sections run. | vp-playground run 40518712476 and later Windows runs, 2026-10-27 | GitHub changes runner networking |
+| GitHub-hosted Linux runners and the maintainer's macOS network have no IPv6 route; IPv6 dials fail at once with "no route to host". | `www.cloudflare.com` showed 2 of 4 TCP connects failing on IPv6 in PR #1 CI and local runs, 2026-10-28 | GitHub adds IPv6 to runners |
+| A Windows Firewall outbound **Block** rule rejects connections immediately (Go: "forbidden by its access permissions"; curl: error 7 after 0 ms) instead of dropping packets. The blocked CI phase therefore checks failure reporting, not timeout duration. | vp-playground run 40522850391, 2026-10-27 | Never by itself; use a different blocking method to measure timeouts |
+| `echo.\| cmd /c tool` satisfies the final `pause` or "Press Enter" prompt on a Windows runner. | All Windows CI runs | — |
+| `[Environment]::GetFolderPath('Desktop')` returns a writable Desktop on Windows runners, so reports land there. | All Windows CI runs | — |
+| Workflow runs on pull requests opened by release-please (`GITHUB_TOKEN`) end as `action_required` and do not test anything. | Release PR #2 run 40616079682, 2026-10-28 | The release workflow uses a different token |
+| The chatbotgang organization lets GitHub Actions create pull requests (`can_approve_pull_request_reviews: true`). | Repository workflow permissions API, 2026-10-28 | Organization Actions policy changes |
+
+## Network and tools
+
+| Fact | Evidence | Recheck when |
+| --- | --- | --- |
+| `maac`, `caac`, and `cdn.platform.cresclab.com` resolve to Cloudflare `104.18.4.188` and `104.18.5.188`; `api.cresclab.com` (34.120.125.52), `api.caac.cresclab.com` (34.111.24.246), and `cdn.caac.cresclab.com` (34.8.204.232) are Google Cloud load balancers. | `dig` from Taiwan, 2026-10-27 | DNS changes; then update `main.go` and the `.bat` together |
+| The Crescendo Lab Cloudflare IPs also answer TLS and HTTP for `www.cloudflare.com` (200). `104.16.123.96` completes TLS for `maac.cresclab.com` and answers 403. Both make the SNI comparison valid. | `curl --resolve` from macOS and Windows runners, 2026-10-27 | Cloudflare plan or IP changes |
+| The `api` and `cdn` hosts do not serve port 80; plain HTTP resets or returns EOF. | Every report since 2026-10-27 | Load balancer configuration changes |
+| `http://maac.cresclab.com/` and `http://caac.cresclab.com/` redirect to `*.pages.dev` instead of to their HTTPS hostnames. Unrelated to this tool, reported separately. | Reports from 2026-10-27 and 2026-10-28 | Cloudflare redirect rules change |
+| curl prints `-w` output even when the transfer fails (`http=000 tcp=0.000000s`), so the `.bat` SNI and repeat lines stay aligned on failure. | Blocked-network `.bat` report, run 40522850391 | — |
+| Go's resolver with `PreferGo` and a custom `Dial` works on Windows; the `.exe` queries 1.1.1.1 and 8.8.8.8 directly there. | Windows `.exe` report, run 40522850391 | — |
+| macOS `ping -W` is in milliseconds; Linux iputils `ping -W` is in seconds. On a PPPoE line the router answers `ping -D -s 1472` with "frag needed and DF set (MTU 1492)". | Local macOS runs and `man ping`, 2026-10-28 | — |
+| A full `.exe` run takes about 1 minute on an open network; the `.bat` takes about 5 minutes because it runs sequentially and `tracert` waits on ICMP timeouts. | Windows CI runs, 2026-10-27 to 2026-10-28 | Timeouts or the check list change |
+
+## Toolchain
+
+| Fact | Evidence | Recheck when |
+| --- | --- | --- |
+| GoReleaser OSS cannot template archive files (`templated_files` is Pro only), so a `before` hook renders the `.bat` version into `build/`. | GoReleaser docs, `customization/package/archives.md`, v2.19.0 | Moving to GoReleaser Pro |
+| release-please proposes 1.0.0 for a first release from manifest `0.0.0` unless `initial-version` is set. | Release PR #2 before and after PR #3, 2026-10-28 | — |
+| A file written with LF line endings breaks `.bat` labels; generated or edited `.bat` content must be converted to CRLF and checked with `file`. | Prototype, 2026-10-27 | — |
+| An editor or tool may write a literal U+FEFF where Go source should contain the escape `"\xef\xbb\xbf"`; Go rejects it with "illegal byte order mark". | Prototype build, 2026-10-27 | — |
+
+## Not verified yet
+
+- Big5 (code page 950) output from `tracert` and `nslookup` converts to readable UTF-8 on Traditional Chinese Windows. Only English Windows runners have run the tools.
+- How long both tools take when a network silently drops packets instead of rejecting them. The `.bat` estimate of up to 12 minutes comes from its timeouts.
+- `windows_arm64`, `darwin_amd64`, and `linux_arm64` binaries run correctly; they are built but not executed.
+- The race detector on Windows: CI skips `-race` there on the assumption that it needs cgo.
