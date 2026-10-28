@@ -17,6 +17,7 @@ need to test again. Remove or update a fact when its recheck condition occurs.
 | `echo.\| cmd /c tool` satisfies the final `pause` or "Press Enter" prompt on a Windows runner. | All Windows CI runs | — |
 | `[Environment]::GetFolderPath('Desktop')` returns a writable Desktop on Windows runners, so reports land there. | All Windows CI runs | — |
 | Workflow runs on pull requests opened by release-please (`GITHUB_TOKEN`) end as `action_required` and do not test anything. | Release PR #2 run 40616079682, 2026-10-28 | The release workflow uses a different token |
+| The repository allows only squash merges, deletes the head branch on merge, and has no branch protection. The squash subject defaults to the commit subject for a single-commit PR and to the PR title otherwise (`COMMIT_OR_PR_TITLE`); the body lists the commit messages. | Repository API, 2026-10-28; a rebase merge of PR #6 was refused | Repository settings change |
 | The chatbotgang organization lets GitHub Actions create pull requests (`can_approve_pull_request_reviews: true`). | Repository workflow permissions API, 2026-10-28 | Organization Actions policy changes |
 
 ## Network and tools
@@ -40,13 +41,17 @@ need to test again. Remove or update a fact when its recheck condition occurs.
 | On macOS 15, 26, and 27 the steps are Apple menu → System Settings → Privacy & Security → Security → Open → Open Anyway → login password → OK, and Open Anyway stays available for about an hour. Localized labels: zh-TW 「隱私權與安全性」「打開」「強制打開」「好」; ja 「プライバシーとセキュリティ」「開く」「このまま開く」「OK」; th "ความเป็นส่วนตัวและความปลอดภัย" "เปิด" "ยืนยันจะเปิด". | Apple guide mh40616 in en, zh-tw, ja-jp, and th-th, versions 15.0, 26, and 27, 2026-10-28 | A new macOS release changes the guide |
 | Windows SmartScreen labels: en "Windows protected your PC" → More info → Run anyway; zh-TW 「Windows 已保護您的電腦」→「其他資訊」→「仍要執行」; ja 「Windows によって PC が保護されました」→「詳細情報」→「実行」. | [ASUS Taiwan FAQ](https://www.asus.com/tw/support/faq/1053651/), [Buffalo FAQ](https://www.buffalo.jp/support/faq/detail/124145337.html), 2026-10-28 | Windows changes the dialog |
 
+| Windows: `ms-settings:about` opens Settings → System → About, whose **Device specifications** show the processor type; Windows 11 on Arm runs x64 programs through emulation, while Windows 10 on Arm emulates only x86. macOS: About This Mac shows **Chip** on Apple silicon and **Processor** on Intel (zh-TW 「關於這台 Mac」「晶片」「處理器」; ja 「このMacについて」「チップ」「プロセッサ」; th "เกี่ยวกับ Mac เครื่องนี้" "ชิป" "โปรเซสเซอร์"). | Microsoft support "Which version of Windows operating system am I running?" and Learn "How emulation works on Arm"; Apple support 116943 in en, zh-tw, ja-jp, th-th; 2026-10-28 | Vendors change the settings pages |
+
 ## Toolchain
 
 | Fact | Evidence | Recheck when |
 | --- | --- | --- |
 | GoReleaser OSS cannot template archive files (`templated_files` is Pro only), so a `before` hook renders the `.bat` version into `build/`. | GoReleaser docs, `customization/package/archives.md`, v2.19.0 | Moving to GoReleaser Pro |
 | release-please proposes 1.0.0 for a first release from manifest `0.0.0` unless `initial-version` is set. | Release PR #2 before and after PR #3, 2026-10-28 | — |
+| `go build ./...` in the repository root writes a `cresclab-netcheck` binary there, because the module has a single main package. `.gitignore` excludes it after one was committed by accident in 2ee5181. | Local build, 2026-10-28 | — |
 | A file written with LF line endings breaks `.bat` labels; generated or edited `.bat` content must be converted to CRLF and checked with `file`. | Prototype, 2026-10-27 | — |
+| golangci-lint refuses to start while another golangci-lint runs on the same machine ("parallel golangci-lint is running"), even in another repository, so `mise run check` can fail because of an unrelated session; rerun it once the other lint finishes. | Local runs, 2026-10-28, while another repository was linting | — |
 | An editor or tool may write a literal U+FEFF where Go source should contain the escape `"\xef\xbb\xbf"`; Go rejects it with "illegal byte order mark". | Prototype build, 2026-10-27 | — |
 
 | `gh run watch` can exit before the run finishes; check the run status again before treating its output as final. | PR #4 CI run 40619973173, 2026-10-28 | — |

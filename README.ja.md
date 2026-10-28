@@ -10,20 +10,26 @@ MAAC や CAAC など Crescendo Lab のサービスに接続できないお客様
 
 ## ダウンロード
 
-- **お客様向け:** 公開されている Google Drive フォルダー
-  [Crescendo Lab Network Check](https://drive.google.com/drive/folders/1qz-rjwxXQvT64_adtLXW_M_-na3qmn4e?usp=sharing)
-  を共有し、[お客様向けガイド](docs/customer-guide.zh-TW.md)（繁体字中国語）を添えてください。
-- **各リリース:** [GitHub Releases](https://github.com/chatbotgang/cresclab-netcheck/releases)
-  に、プラットフォームごとのアーカイブ、単体の `cresclab-netcheck.bat`、`checksums.txt` があります。
+[最新リリース](https://github.com/chatbotgang/cresclab-netcheck/releases/latest)からダウンロードします。このリポジトリは private のため、リリースページを開けるのは chatbotgang 組織のメンバーだけです。ファイルをダウンロードし、[お客様向けガイド](docs/customer-guide.zh-TW.md)（繁体字中国語）と一緒にお客様に送ってください。
 
-| プラットフォーム | アーカイブ | ビルド | CI での実行 |
+各リリースには、プラットフォームごとのアーカイブ、単体の `cresclab-netcheck.bat`、`checksums.txt` があります。アーカイブ名は `cresclab-netcheck_<バージョン>_<OS>_<アーキテクチャ>` の形式なので、名前の末尾で選びます。
+
+### ファイルの選び方
+
+| パソコン | ファイル名の末尾 | ビルド | CI での実行 |
 | --- | --- | --- | --- |
-| Windows x64 | `windows_amd64.zip` | ✓ | ✓ 通常のネットワークと遮断されたネットワーク |
-| Windows ARM64 | `windows_arm64.zip` | ✓ | — |
-| macOS Apple シリコン | `darwin_arm64.tar.gz` | ✓ | ✓ |
-| macOS Intel | `darwin_amd64.tar.gz` | ✓ | — |
-| Linux x64 | `linux_amd64.tar.gz` | ✓ | ✓ |
-| Linux ARM64 | `linux_arm64.tar.gz` | ✓ | — |
+| Intel または AMD の Windows（ほとんどのパソコン） | `_windows_amd64.zip` | ✓ | ✓ 通常のネットワークと遮断されたネットワーク |
+| Arm の Windows（Snapdragon 搭載ノートパソコンなど） | `_windows_arm64.zip` | ✓ | — |
+| Apple シリコン（M シリーズ）の Mac | `_darwin_arm64.tar.gz` | ✓ | ✓ |
+| Intel プロセッサの Mac | `_darwin_amd64.tar.gz` | ✓ | — |
+| Intel または AMD の Linux | `_linux_amd64.tar.gz` | ✓ | ✓ |
+| Arm の Linux | `_linux_arm64.tar.gz` | ✓ | — |
+
+`amd64` は 64 ビットの Intel または AMD プロセッサ（x64、x86-64 とも呼ばれます）、`arm64` は 64 ビットの Arm プロセッサを指します。
+
+- **Windows:** Windows+R を押して `ms-settings:about` と入力し、「**デバイスの仕様**」のプロセッサ情報を確認します。`x64` なら `windows_amd64`、`ARM` なら `windows_arm64` です。PowerShell で `$env:PROCESSOR_ARCHITECTURE` を実行すると `AMD64` か `ARM64` が表示されます。迷ったら `windows_amd64` を選んでください。Windows 11 on Arm はエミュレーションで x64 のプログラムを実行できます。
+- **macOS:** アップルメニュー ＞「**このMacについて**」を選択します。「**チップ**」に Apple の M チップが表示されれば `darwin_arm64`、「**プロセッサ**」に Intel のプロセッサが表示されれば `darwin_amd64` です。
+- **Linux:** `uname -m` が `x86_64` なら `linux_amd64`、`aarch64` または `arm64` なら `linux_arm64` です。
 
 Windows のアーカイブには `cresclab-netcheck.bat` も入っています。これはプレーンテキスト版で、お客様の IT チームが実行前に中身を確認できます。会社のポリシーで署名のない実行ファイルがブロックされる場合はこちらを使ってください。`.exe` のほうが速く、サマリーも出力されます。
 
@@ -100,5 +106,4 @@ mise run snapshot  # build and package every target into dist/
 
 - **CI** は pull request ごとと `main` への push ごとに実行されます。lint、Linux・macOS・Windows でのユニットテスト、全プラットフォームのスナップショットビルド、ビルドしたプログラムの Linux・macOS・Windows での実行を行います。Windows では、`.bat` と `.exe` を Windows ファイアウォールで Crescendo Lab の Cloudflare IP を遮断したネットワークでも実行し、失敗時の流れが最後まで進んで正しく報告されることを確認します。
 - **リリース**は [Conventional Commits](https://www.conventionalcommits.org/) に従います。release-please が `main` にリリース用の pull request を開いたままにします。これをマージするとタグと GitHub リリースが作成され、同じ workflow で GoReleaser がアーカイブ、単体の `.bat`、`checksums.txt` をアップロードします。release-please が開く pull request は `GITHUB_TOKEN` を使うため CI は実行されません。変更されるのは `CHANGELOG.md` とバージョンの manifest だけです。
-- リリース後は、Google Drive フォルダーのファイルを新しい `cresclab-netcheck.bat` と `windows_amd64.zip` 内の `.exe` に差し替えてください。
 - **依存関係:** Dependabot が毎週、Go モジュールと GitHub Actions の pull request を開きます。`mise.toml` のツールのバージョンは手動で更新してください。
