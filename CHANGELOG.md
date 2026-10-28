@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/chatbotgang/cresclab-netcheck/compare/v0.1.0...v0.2.0) (2026-10-28)
+
+
+### Features
+
+* open the report with a one-line verdict ([2ee5181](https://github.com/chatbotgang/cresclab-netcheck/commit/2ee51811db75c5131a1c1c227868d9757d7acf1e))
+
 ## 0.1.0 (2026-10-28)
 
 
